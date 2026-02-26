@@ -6,6 +6,7 @@
 #include "networking_client.h"
 
 struct MicroTxnAuthorizationResponse_t;
+class ServerGC;
 
 struct Transaction
 {
@@ -16,7 +17,7 @@ struct Transaction
 class ClientGC final : public SharedGC
 {
 public:
-    ClientGC(uint64_t steamId, ISteamNetworkingMessages *networkingMessages);
+    ClientGC(uint64_t steamId, ISteamNetworking *networking);
     ~ClientGC();
 
     void HandleMessage(uint32_t type, const void *data, uint32_t size);
@@ -29,6 +30,9 @@ public:
     // called from net code
     void SendSOCacheToGameSever();
     void HandleNetMessage(GCMessageRead &messageRead);
+
+    // Listen-server (offline/bots) mode: bypass P2P and inject directly into ServerGC
+    void SetListenServer(ServerGC *serverGC, uint64_t serverSteamId);
 
     // passed to net code
     void SetAuthTicket(uint32_t handle, const void *data, uint32_t size);
@@ -51,8 +55,8 @@ private:
     void StorePurchaseInit(GCMessageRead &messageRead);
     void StorePurchaseFinalize(GCMessageRead &messageRead);
 
-    void DeleteItem(GCMessageRead &messageRead);
     void UnlockCrate(GCMessageRead &messageRead);
+    void EconPreviewDataBlockRequest(GCMessageRead &messageRead);
     void NameItem(GCMessageRead &messageRead);
     void NameBaseItem(GCMessageRead &messageRead);
     void RemoveItemName(GCMessageRead &messageRead);

@@ -1,8 +1,9 @@
 #pragma once
 
-#include <steam/isteamnetworkingmessages.h>
+#include <steam/steam_api.h>
+#include <steam/steam_gameserver.h>
 
-constexpr int NetMessageSendFlags = k_nSteamNetworkingSend_Reliable;
+constexpr EP2PSend NetMessageSendType = k_EP2PSendReliable;
 constexpr int NetMessageChannel = 7;
 
 // NOTE: these are used as gc message types!

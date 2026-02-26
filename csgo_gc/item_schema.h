@@ -131,6 +131,8 @@ public:
     // item creation: id and account id not set, needs to be done by the caller
     bool CreateItem(uint32_t defIndex, ItemOrigin origin, UnacknowledgedType unacknowledgedType, CSOEconItem &econItem) const;
 
+    const ItemInfo *ItemInfoByDefIndex(uint32_t defIndex) const;
+
 public:
     // these could be parsed from the item schema but reduce code complexity by hardcoding them
     enum Rarity
@@ -243,6 +245,7 @@ private:
     StickerKitInfo *StickerKitInfoByName(std::string_view name);
     PaintKitInfo *PaintKitInfoByName(std::string_view name);
     MusicDefinitionInfo *MusicDefinitionInfoByName(std::string_view name);
+
 
     std::unordered_map<uint32_t, ItemInfo> m_itemInfo;
     std::unordered_map<uint32_t, AttributeInfo> m_attributeInfo;

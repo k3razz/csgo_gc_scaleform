@@ -7,15 +7,6 @@
 #include "platform.h"
 #include <funchook.h>
 
-// defines STEAM_PRIVATE_API
-#include <steam/steam_api_common.h>
-
-#undef STEAM_PRIVATE_API // we need these public so we can proxy them
-#define STEAM_PRIVATE_API(...) __VA_ARGS__
-
-// mikkotodo update the sdk...
-struct SteamNetworkingIdentity;
-
 #include <steam/steam_api.h>
 #include <steam/steam_gameserver.h>
 #include <steam/isteamgamecoordinator.h>
@@ -62,12 +53,12 @@ public:
         if (m_server)
         {
             assert(!s_serverGC);
-            s_serverGC = new ServerGC{ SteamGameServerNetworkingMessages() };
+            s_serverGC = new ServerGC{};
         }
         else
         {
             assert(!s_clientGC);
-            s_clientGC = new ClientGC{ steamId, SteamNetworkingMessages() };
+            s_clientGC = new ClientGC{ steamId, SteamNetworking() };
         }
     }
 
@@ -260,11 +251,6 @@ public:
         return m_original->GetAPICallResult(hSteamAPICall, pCallback, cubCallback, iCallbackExpected, pbFailed);
     }
 
-    void RunFrame() override
-    {
-        m_original->RunFrame();
-    }
-
     uint32 GetIPCCallCount() override
     {
         return m_original->GetIPCCallCount();
@@ -275,6 +261,10 @@ public:
         m_original->SetWarningMessageHook(pFunction);
     }
 
+protected:
+    void RunFrame() override {} // STEAM_PRIVATE_API - protected in 2017
+
+public:
     bool IsOverlayEnabled() override
     {
         return m_original->IsOverlayEnabled();
@@ -330,51 +320,6 @@ public:
     {
         m_original->StartVRDashboard();
     }
-
-    bool IsVRHeadsetStreamingEnabled() override
-    {
-        return m_original->IsVRHeadsetStreamingEnabled();
-    }
-
-    void SetVRHeadsetStreamingEnabled(bool bEnabled) override
-    {
-        m_original->SetVRHeadsetStreamingEnabled(bEnabled);
-    }
-
-    bool IsSteamChinaLauncher() override
-    {
-        return m_original->IsSteamChinaLauncher();
-    }
-
-    bool InitFilterText(uint32 unFilterOptions) override
-    {
-        return m_original->InitFilterText(unFilterOptions);
-    }
-
-    int FilterText(ETextFilteringContext eContext, CSteamID sourceSteamID, const char *pchInputMessage, char *pchOutFilteredText, uint32 nByteSizeOutFilteredText) override
-    {
-        return m_original->FilterText(eContext, sourceSteamID, pchInputMessage, pchOutFilteredText, nByteSizeOutFilteredText);
-    }
-
-    ESteamIPv6ConnectivityState GetIPv6ConnectivityState(ESteamIPv6ConnectivityProtocol eProtocol) override
-    {
-        return m_original->GetIPv6ConnectivityState(eProtocol);
-    }
-
-    bool IsSteamRunningOnSteamDeck() override
-    {
-        return m_original->IsSteamRunningOnSteamDeck();
-    }
-
-    bool ShowFloatingGamepadTextInput(EFloatingGamepadTextInputMode eKeyboardMode, int nTextFieldXPosition, int nTextFieldYPosition, int nTextFieldWidth, int nTextFieldHeight) override
-    {
-        return m_original->ShowFloatingGamepadTextInput(eKeyboardMode, nTextFieldXPosition, nTextFieldYPosition, nTextFieldWidth, nTextFieldHeight);
-    }
-
-    void SetGameLauncherMode(bool bLauncherMode) override
-    {
-        m_original->SetGameLauncherMode(bLauncherMode);
-    }
 };
 
 class SteamGameServerProxy final : public ISteamGameServer
@@ -391,10 +336,10 @@ public:
     bool InitGameServer(uint32 unIP, uint16 usGamePort, uint16 usQueryPort, uint32 unFlags, AppId_t nGameAppId, const char *pchVersionString) override
     {
         // no longer present in steamworks sdk
-        constexpr uint32 k_unServerFlagSecure = 2;
+        constexpr uint32 k_unServerFlagSecureLocal = 2;
 
         // never run secure!!!
-        unFlags &= ~k_unServerFlagSecure;
+        unFlags &= ~k_unServerFlagSecureLocal;
 
         // make sure we're up to date
         pchVersionString = "1.99.9.9";
@@ -535,11 +480,6 @@ public:
         m_original->SetRegion(pszRegion);
     }
 
-    void SetAdvertiseServerActive(bool bActive) override
-    {
-        m_original->SetAdvertiseServerActive(bActive);
-    }
-
     HAuthTicket GetAuthSessionTicket(void *pTicket, int cbMaxTicket, uint32 *pcbTicket) override
     {
         return m_original->GetAuthSessionTicket(pTicket, cbMaxTicket, pcbTicket);
@@ -550,7 +490,20 @@ public:
         EBeginAuthSessionResult result = m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
         if (s_serverGC && result == k_EBeginAuthSessionResultOK)
         {
-            s_serverGC->ClientConnected(steamID.ConvertToUint64(), pAuthTicket, cbAuthTicket);
+            uint64_t clientSteamId = steamID.ConvertToUint64();
+            s_serverGC->ClientConnected(clientSteamId, pAuthTicket, cbAuthTicket);
+
+            // For listen-server (offline/bots) mode there is no game-server Steam networking,
+            // so the normal P2P handshake (k_EMsgNetworkConnect) never happens and the client
+            // never sends its SO cache to the server.  Detect this and wire up a direct in-
+            // process channel so that all subsequent GC-to-server messages (equip updates,
+            // SO cache) are delivered without going through Steam P2P.
+            if (s_clientGC && !SteamGameServerNetworking())
+            {
+                Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
+                s_clientGC->SetListenServer(s_serverGC, clientSteamId);
+                s_clientGC->SendSOCacheToGameSever();
+            }
         }
 
         return result;
@@ -591,7 +544,7 @@ public:
         return m_original->GetServerReputation();
     }
 
-    SteamIPAddress_t GetPublicIP() override
+    uint32 GetPublicIP() override
     {
         return m_original->GetPublicIP();
     }
@@ -616,9 +569,9 @@ public:
         return m_original->ComputeNewPlayerCompatibility(steamIDNewPlayer);
     }
 
-    bool SendUserConnectAndAuthenticate_DEPRECATED(uint32 unIPClient, const void *pvAuthBlob, uint32 cubAuthBlobSize, CSteamID *pSteamIDUser) override
+    bool SendUserConnectAndAuthenticate(uint32 unIPClient, const void *pvAuthBlob, uint32 cubAuthBlobSize, CSteamID *pSteamIDUser) override
     {
-        return m_original->SendUserConnectAndAuthenticate_DEPRECATED(unIPClient, pvAuthBlob, cubAuthBlobSize, pSteamIDUser);
+        return m_original->SendUserConnectAndAuthenticate(unIPClient, pvAuthBlob, cubAuthBlobSize, pSteamIDUser);
     }
 
     CSteamID CreateUnauthenticatedUserConnection() override
@@ -626,9 +579,9 @@ public:
         return m_original->CreateUnauthenticatedUserConnection();
     }
 
-    void SendUserDisconnect_DEPRECATED(CSteamID steamIDUser) override
+    void SendUserDisconnect(CSteamID steamIDUser) override
     {
-        m_original->SendUserDisconnect_DEPRECATED(steamIDUser);
+        m_original->SendUserDisconnect(steamIDUser);
     }
 
     bool BUpdateUserData(CSteamID steamIDUser, const char *pchPlayerName, uint32 uScore) override
@@ -636,14 +589,19 @@ public:
         return m_original->BUpdateUserData(steamIDUser, pchPlayerName, uScore);
     }
 
-    void SetMasterServerHeartbeatInterval_DEPRECATED(int iHeartbeatInterval) override
+    void SetHeartbeatInterval(int iHeartbeatInterval) override
     {
-        m_original->SetMasterServerHeartbeatInterval_DEPRECATED(iHeartbeatInterval);
+        m_original->SetHeartbeatInterval(iHeartbeatInterval);
     }
 
-    void ForceMasterServerHeartbeat_DEPRECATED() override
+    void EnableHeartbeats(bool bActive) override
     {
-        m_original->ForceMasterServerHeartbeat_DEPRECATED();
+        m_original->EnableHeartbeats(bActive);
+    }
+
+    void ForceHeartbeat() override
+    {
+        m_original->ForceHeartbeat();
     }
 };
 
@@ -672,14 +630,14 @@ public:
         return m_original->GetSteamID();
     }
 
-    int InitiateGameConnection_DEPRECATED(void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer, bool bSecure) override
+    int InitiateGameConnection(void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer, bool bSecure) override
     {
-        return m_original->InitiateGameConnection_DEPRECATED(pAuthBlob, cbMaxAuthBlob, steamIDGameServer, unIPServer, usPortServer, bSecure);
+        return m_original->InitiateGameConnection(pAuthBlob, cbMaxAuthBlob, steamIDGameServer, unIPServer, usPortServer, bSecure);
     }
 
-    void TerminateGameConnection_DEPRECATED(uint32 unIPServer, uint16 usPortServer) override
+    void TerminateGameConnection(uint32 unIPServer, uint16 usPortServer) override
     {
-        m_original->TerminateGameConnection_DEPRECATED(unIPServer, usPortServer);
+        m_original->TerminateGameConnection(unIPServer, usPortServer);
     }
 
     void TrackAppUsageEvent(CGameID gameID, int eAppUsageEvent, const char *pchExtraInfo) override
@@ -722,9 +680,9 @@ public:
         return m_original->GetVoiceOptimalSampleRate();
     }
 
-    HAuthTicket GetAuthSessionTicket(void *pTicket, int cbMaxTicket, uint32 *pcbTicket, const SteamNetworkingIdentity *pSteamNetworkingIdentity) override
+    HAuthTicket GetAuthSessionTicket(void *pTicket, int cbMaxTicket, uint32 *pcbTicket) override
     {
-        HAuthTicket ticket = m_original->GetAuthSessionTicket(pTicket, cbMaxTicket, pcbTicket, pSteamNetworkingIdentity);
+        HAuthTicket ticket = m_original->GetAuthSessionTicket(pTicket, cbMaxTicket, pcbTicket);
         if (s_clientGC && ticket != k_HAuthTicketInvalid)
         {
             s_clientGC->SetAuthTicket(ticket, pTicket, *pcbTicket);
@@ -803,30 +761,6 @@ public:
         return m_original->BIsTwoFactorEnabled();
     }
 
-    bool BIsPhoneIdentifying() override
-    {
-        return m_original->BIsPhoneIdentifying();
-    }
-
-    bool BIsPhoneRequiringVerification() override
-    {
-        return m_original->BIsPhoneRequiringVerification();
-    }
-
-    SteamAPICall_t GetMarketEligibility() override
-    {
-        return m_original->GetMarketEligibility();
-    }
-
-    SteamAPICall_t GetDurationControl() override
-    {
-        return m_original->GetDurationControl();
-    }
-
-    bool BSetDurationControlOnlineState(EDurationControlOnlineState eNewState) override
-    {
-        return m_original->BSetDurationControlOnlineState(eNewState);
-    }
 };
 
 class SteamMatchmakingServersProxy : public ISteamMatchmakingServers
@@ -1118,7 +1052,7 @@ public:
         return PROXY_INTERFACE(GetISteamGameServer, hSteamUser, hSteamPipe, pchVersion);
     }
 
-    void SetLocalIPBinding(const SteamIPAddress_t &unIP, uint16 usPort) override
+    void SetLocalIPBinding(uint32 unIP, uint16 usPort) override
     {
         m_original->SetLocalIPBinding(unIP, usPort);
     }
@@ -1178,16 +1112,6 @@ public:
         return PROXY_INTERFACE(GetISteamScreenshots, hSteamuser, hSteamPipe, pchVersion);
     }
 
-    ISteamGameSearch *GetISteamGameSearch(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
-    {
-        return PROXY_INTERFACE(GetISteamGameSearch, hSteamuser, hSteamPipe, pchVersion);
-    }
-
-    void RunFrame() override
-    {
-        m_original->RunFrame();
-    }
-
     uint32 GetIPCCallCount() override
     {
         return m_original->GetIPCCallCount();
@@ -1208,9 +1132,9 @@ public:
         return PROXY_INTERFACE(GetISteamHTTP, hSteamuser, hSteamPipe, pchVersion);
     }
 
-    void *DEPRECATED_GetISteamUnifiedMessages(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    ISteamUnifiedMessages *GetISteamUnifiedMessages(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
-        return PROXY_INTERFACE(DEPRECATED_GetISteamUnifiedMessages, hSteamuser, hSteamPipe, pchVersion);
+        return PROXY_INTERFACE(GetISteamUnifiedMessages, hSteamuser, hSteamPipe, pchVersion);
     }
 
     ISteamController *GetISteamController(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
@@ -1243,21 +1167,6 @@ public:
         return PROXY_INTERFACE(GetISteamHTMLSurface, hSteamuser, hSteamPipe, pchVersion);
     }
 
-    void DEPRECATED_Set_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
-    {
-        m_original->DEPRECATED_Set_SteamAPI_CPostAPIResultInProcess(func);
-    }
-
-    void DEPRECATED_Remove_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
-    {
-        m_original->DEPRECATED_Remove_SteamAPI_CPostAPIResultInProcess(func);
-    }
-
-    void Set_SteamAPI_CCheckCallbackRegisteredInProcess(SteamAPI_CheckCallbackRegistered_t func) override
-    {
-        m_original->Set_SteamAPI_CCheckCallbackRegisteredInProcess(func);
-    }
-
     ISteamInventory *GetISteamInventory(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
         return PROXY_INTERFACE(GetISteamInventory, hSteamuser, hSteamPipe, pchVersion);
@@ -1268,30 +1177,26 @@ public:
         return PROXY_INTERFACE(GetISteamVideo, hSteamuser, hSteamPipe, pchVersion);
     }
 
-    ISteamParentalSettings *GetISteamParentalSettings(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
+protected:
+    // These are protected helper methods in the interface that we must implement
+    void RunFrame() override {} // STEAM_PRIVATE_API - protected in 2017
+
+    void DEPRECATED_Set_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
     {
-        return PROXY_INTERFACE(GetISteamParentalSettings, hSteamuser, hSteamPipe, pchVersion);
+        // Can't call protected method on m_original, just ignore
+        (void)func;
     }
 
-    ISteamInput *GetISteamInput(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    void DEPRECATED_Remove_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
     {
-        return PROXY_INTERFACE(GetISteamInput, hSteamUser, hSteamPipe, pchVersion);
+        // Can't call protected method on m_original, just ignore
+        (void)func;
     }
 
-    ISteamParties *GetISteamParties(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    void Set_SteamAPI_CCheckCallbackRegisteredInProcess(SteamAPI_CheckCallbackRegistered_t func) override
     {
-        return PROXY_INTERFACE(GetISteamParties, hSteamUser, hSteamPipe, pchVersion);
-    }
-
-    ISteamRemotePlay *GetISteamRemotePlay(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
-    {
-        return PROXY_INTERFACE(GetISteamRemotePlay, hSteamUser, hSteamPipe, pchVersion);
-    }
-
-    void DestroyAllInterfaces() override
-    {
-        m_proxies.clear();
-        m_original->DestroyAllInterfaces();
+        // Can't call protected method on m_original, just ignore
+        (void)func;
     }
 };
 
@@ -1520,7 +1425,7 @@ static bool InitializeSteamAPI(bool dedicated)
 {
     if (dedicated)
     {
-        return SteamGameServer_Init(0, 0, STEAMGAMESERVER_QUERY_PORT_SHARED, eServerModeNoAuthentication, "1.38.7.9");
+        return SteamGameServer_Init(0, 0, 0, MASTERSERVERUPDATERPORT_USEGAMESOCKETSHARE, eServerModeNoAuthentication, "1.38.7.9");
     }
     else
     {
@@ -1542,7 +1447,7 @@ static void ShutdownSteamAPI(bool dedicated)
 
 void SteamHookInstall(bool dedicated)
 {
-    Platform::EnsureEnvVarSet("SteamAppId", "730");
+    Platform::EnsureEnvVarSet("SteamAppId", "480");
 
     // this is bit of a clusterfuck
     if (!InitializeSteamAPI(dedicated))

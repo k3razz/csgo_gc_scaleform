@@ -6,8 +6,7 @@
 
 const char *MessageName(uint32_t type);
 
-ServerGC::ServerGC(ISteamNetworkingMessages *networkingMessages)
-    : m_networking{ networkingMessages }
+ServerGC::ServerGC()
 {
     Platform::Print("ServerGC spawned\n");
 
@@ -75,15 +74,15 @@ void ServerGC::Update()
 {
     if (!m_receivedHello)
     {
-        // we're not up yet
+        // we're not up yet, just sit and wait
         return;
     }
 
-    SteamNetworkingMessage_t *message;
-    while (m_networking.ReceiveMessage(message))
+    uint64_t steamId;
+    std::vector<uint8_t> data;
+    while (m_networking.ReceiveMessage(steamId, data))
     {
-        HandleNetMessage(message->m_identityPeer.GetSteamID64(), message->GetData(), message->GetSize());
-        message->Release();
+        HandleNetMessage(steamId, data.data(), data.size());
     }
 }
 
@@ -168,6 +167,8 @@ void ServerGC::OnServerHello(GCMessageRead &messageRead)
         return;
     }
 
+    Platform::Print("ServerGC received ServerHello\n");
+
     // we don't care about anything in this message, just reply
 
     CMsgCStrike15Welcome csWelcome;
@@ -181,6 +182,7 @@ void ServerGC::OnServerHello(GCMessageRead &messageRead)
     m_outgoingMessages.emplace(k_EMsgGCServerWelcome, welcome);
 
     m_receivedHello = true;
+    Platform::Print("ServerGC sent ServerWelcome and is ready\n");
 }
 
 void ServerGC::IncrementKillCountAttribute(GCMessageRead &messageRead)

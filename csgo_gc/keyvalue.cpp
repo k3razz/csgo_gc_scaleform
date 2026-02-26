@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "keyvalue.h"
 
+#include <algorithm>
+
 constexpr auto SubkeyReserveCount = 8;
 
 // for writing binary keyvalues
@@ -260,6 +262,30 @@ bool KeyValue::Parse(KeyValueParser &parser)
     }
 }
 
+void KeyValue::RemoveSubkey(std::string_view name)
+{
+    auto it = std::remove_if(m_subkeys.begin(), m_subkeys.end(),
+        [name](const KeyValue &kv)
+        {
+            return kv.Name() == name;
+        });
+
+    if (it != m_subkeys.end())
+    {
+        m_subkeys.erase(it, m_subkeys.end());
+    }
+}
+
+void KeyValue::RemoveSubkeyRecursive(std::string_view name)
+{
+    RemoveSubkey(name);
+
+    for (KeyValue &subkey : m_subkeys)
+    {
+        subkey.RemoveSubkeyRecursive(name);
+    }
+}
+
 KeyValue *KeyValue::FindOrCreateSubkey(std::string_view name)
 {
     for (KeyValue &subkey : m_subkeys)
@@ -334,6 +360,19 @@ const KeyValue *KeyValue::GetSubkey(std::string_view name) const
     return nullptr;
 }
 
+KeyValue *KeyValue::GetSubkeyMutable(std::string_view name)
+{
+    for (KeyValue &subkey : m_subkeys)
+    {
+        if (subkey.m_name == name)
+        {
+            return &subkey;
+        }
+    }
+
+    return nullptr;
+}
+
 std::string_view KeyValue::GetString(std::string_view name, std::string_view fallback) const
 {
     const KeyValue *subkey = GetSubkey(name);
@@ -353,5 +392,16 @@ KeyValue &KeyValue::AddSubkey(std::string_view name)
 void KeyValue::AddString(std::string_view name, std::string_view value)
 {
     KeyValue &subkey = AddSubkey(name);
+    subkey.m_string = value;
+}
+
+KeyValue &KeyValue::GetOrCreateSubkey(std::string_view name)
+{
+    return *FindOrCreateSubkey(name);
+}
+
+void KeyValue::SetString(std::string_view name, std::string_view value)
+{
+    KeyValue &subkey = GetOrCreateSubkey(name);
     subkey.m_string = value;
 }

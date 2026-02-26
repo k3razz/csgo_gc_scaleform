@@ -2,6 +2,7 @@
 #include <wchar.h>
 #include <array>
 #include <string>
+#include <cstdio>
 
 #if !defined(DEDICATED)
 
@@ -107,8 +108,42 @@ static void *LoadModuleAndFindSymbol(const wchar_t *abosoluteModulePath, const c
     return function;
 }
 
+void RedirectOutputToFile()
+{
+    wchar_t basePath[MAX_PATH];
+    wchar_t logFilePath[MAX_PATH];
+    
+    // Get the current executable directory
+    DWORD length = GetCurrentDirectoryW(std::size(basePath), basePath);
+    if (length == 0 || length >= std::size(basePath))
+        return;
+    
+    // Build full path to log file
+    _snwprintf_s(logFilePath, std::size(logFilePath), L"%ls\\csgo_gc_debug.log", basePath);
+    
+    // Convert wide string to narrow for freopen_s
+    char logFilePathA[MAX_PATH];
+    size_t convertedChars = 0;
+    wcstombs_s(&convertedChars, logFilePathA, std::size(logFilePathA), logFilePath, std::size(logFilePath));
+    
+    // Redirect stdout and stderr to file
+    FILE* fileHandle = nullptr;
+    
+    if (freopen_s(&fileHandle, logFilePathA, "w", stdout) == 0 && fileHandle)
+    {
+        setvbuf(stdout, nullptr, _IONBF, 0);  // Unbuffered
+    }
+    
+    if (freopen_s(&fileHandle, logFilePathA, "a", stderr) == 0 && fileHandle)
+    {
+        setvbuf(stderr, nullptr, _IONBF, 0);  // Unbuffered
+    }
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
+    RedirectOutputToFile();
+    
     wchar_t baseDir[MAX_PATH];
     wchar_t modulePath[MAX_PATH];
 

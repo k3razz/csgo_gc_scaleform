@@ -53,11 +53,16 @@ public:
 
     // parsing helpers
     const KeyValue *GetSubkey(std::string_view name) const;
+    KeyValue *GetSubkeyMutable(std::string_view name);
     std::string_view GetString(std::string_view name, std::string_view fallback = {}) const;
 
     // writing helpers
     KeyValue &AddSubkey(std::string_view name);
     void AddString(std::string_view name, std::string_view value);
+    KeyValue &GetOrCreateSubkey(std::string_view name);
+    void SetString(std::string_view name, std::string_view value);
+    void RemoveSubkey(std::string_view name);
+    void RemoveSubkeyRecursive(std::string_view name);
 
     // template helpers for parsing/writing integers/floats
 

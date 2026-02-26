@@ -50,10 +50,33 @@ GCMessageRead::GCMessageRead(uint32_t type, const void *data, uint32_t size)
     }
     else
     {
-        // reading a GameStructMsgHeader
-        ReadUint32();
-        ReadUint64();
-        ReadUint16();
+        // reading a GameStructMsgHeader (GCMsgHdrEx_t = 34 bytes total):
+        //   uint32  m_eMsg            ← already consumed above (offset 0)
+        //   uint32  m_nSrcGCDirIndex  (offset 4)
+        //   uint64  m_ulSteamID       (offset 8)
+        //   uint16  m_nHdrVersion     (offset 16)
+        //   uint64  m_JobIDTarget     (offset 18) ← keyId for UnlockCrate
+        //   uint64  m_JobIDSource     (offset 26) ← save as m_jobId for response routing
+        
+        // Log the raw bytes for debugging
+        if (size >= 34)
+        {
+            Platform::Print("[STRUCT MSG %u] Raw 34 bytes from offset 0: ", m_type);
+            for (int i = 0; i < 34; i++)
+            {
+                Platform::Print("%02X ", m_data[i]);
+            }
+            Platform::Print("\n");
+        }
+        
+        ReadUint32();                    // m_nSrcGCDirIndex
+        ReadUint64();                    // m_ulSteamID
+        ReadUint16();                    // m_nHdrVersion
+        m_jobIdTarget = ReadUint64();    // m_JobIDTarget → keyId for UnlockCrate
+        m_jobId = ReadUint64();          // m_JobIDSource
+        
+        Platform::Print("[STRUCT MSG %u] Parsed: offset now at %u, jobIdTarget=%llu, jobIdSource=%llu\n", 
+                        m_type, m_offset, m_jobIdTarget, m_jobId);
     }
 
     // caller needs to check for this
@@ -148,13 +171,37 @@ GCMessageWrite::GCMessageWrite(uint32_t type, const google::protobuf::MessageLit
 GCMessageWrite::GCMessageWrite(uint32_t type)
     : m_type{ type }
 {
-    // write the non protobuf messge hader
-    // mikkotoodo using GameStructMsgHeader is wrong here!!! we should be using the fat one
-    // however we're not sending these to the game (yet) so it doesn't matter
-    WriteUint32(m_type);
-    WriteUint32(0);
-    WriteUint64(0);
-    WriteUint16(0);
+    // GCMsgHdrEx_t layout (packed, 34 bytes total):
+    //   uint32  m_eMsg
+    //   uint32  m_nSrcGCDirIndex
+    //   uint64  m_ulSteamID
+    //   uint16  m_nHdrVersion   (must be 1)
+    //   uint64  m_JobIDTarget   (JobIdInvalid)
+    //   uint64  m_JobIDSource   (JobIdInvalid)
+    WriteUint32(m_type);     // m_eMsg
+    WriteUint32(0);          // m_nSrcGCDirIndex
+    WriteUint64(0);          // m_ulSteamID
+    WriteUint16(1);          // m_nHdrVersion = k_nHdrVersion
+    WriteUint64(JobIdInvalid); // m_JobIDTarget
+    WriteUint64(JobIdInvalid); // m_JobIDSource
+}
+
+GCMessageWrite::GCMessageWrite(uint32_t type, uint64_t jobIdSource)
+    : m_type{ type }
+{
+    // GCMsgHdrEx_t layout with source job ID for routing responses back to client:
+    //   uint32  m_eMsg
+    //   uint32  m_nSrcGCDirIndex
+    //   uint64  m_ulSteamID
+    //   uint16  m_nHdrVersion   (must be 1)
+    //   uint64  m_JobIDTarget   (response targets the requesting job)
+    //   uint64  m_JobIDSource   (server's job ID)
+    WriteUint32(m_type);            // m_eMsg
+    WriteUint32(0);                 // m_nSrcGCDirIndex
+    WriteUint64(0);                 // m_ulSteamID
+    WriteUint16(1);                 // m_nHdrVersion = k_nHdrVersion
+    WriteUint64(jobIdSource);       // m_JobIDTarget = requesting job (for routing)
+    WriteUint64(JobIdInvalid);      // m_JobIDSource = no outgoing job
 }
 
 GCMessageWrite::GCMessageWrite(const void *data, uint32_t size)

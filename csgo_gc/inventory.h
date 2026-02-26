@@ -19,8 +19,6 @@ public:
 
     bool EquipItem(uint64_t itemId, uint32_t classId, uint32_t slotId, CMsgSOMultipleObjects &update);
 
-    bool RemoveItem(uint64_t itemId, CMsgSOSingleObject &destroy);
-
     bool UseItem(uint64_t itemId,
         CMsgSOSingleObject &destroy,
         CMsgSOMultipleObjects &updateMultiple,
@@ -72,6 +70,12 @@ public:
     // returns the item id and adds the item to the provided CMsgSOMultipleObjects
     // on failure returns 0 and does nothing
     uint64_t PurchaseItem(uint32_t defIndex, std::vector<CMsgSOSingleObject> &update);
+
+    const ItemInfo *ItemInfoByDefIndex(uint32_t defIndex) const;
+
+    // Fills block with preview data for the item with the given ID.
+    // Returns false if the item is not found.
+    bool GetItemPreviewData(uint64_t itemId, CEconItemPreviewDataBlock &block);
 
 private:
     uint32_t AccountId() const;

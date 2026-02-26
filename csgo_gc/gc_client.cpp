@@ -1,14 +1,15 @@
 #include "stdafx.h"
 #include "gc_client.h"
+#include "gc_server.h"
 #include "graffiti.h"
 #include "keyvalue.h"
 #include "steam/isteamuser.h" // MicroTxnAuthorizationResponse_t
 
 const char *MessageName(uint32_t type);
 
-ClientGC::ClientGC(uint64_t steamId, ISteamNetworkingMessages *networkingMessages)
+ClientGC::ClientGC(uint64_t steamId, ISteamNetworking *networking)
     : m_steamId{ steamId }
-    , m_networking{ this, networkingMessages }
+    , m_networking{ this, networking }
     , m_inventory{ steamId, m_config }
 {
     Platform::Print("ClientGC spawned for user %llu\n", steamId);
@@ -31,8 +32,13 @@ void ClientGC::HandleMessage(uint32_t type, const void *data, uint32_t size)
         return;
     }
 
+    uint32_t unmaskedType = messageRead.TypeUnmasked();
+    Platform::Print("ClientGC::HandleMessage: type=%u/0x%X, size=%u, structMsg=%d\n",
+                    unmaskedType, unmaskedType, size, !messageRead.IsProtobuf());
+
     if (messageRead.IsProtobuf())
     {
+        Platform::Print("  → protobuf message\n");
         switch (messageRead.TypeUnmasked())
         {
         case k_EMsgGCClientHello:
@@ -75,20 +81,51 @@ void ClientGC::HandleMessage(uint32_t type, const void *data, uint32_t size)
             StorePurchaseFinalize(messageRead);
             break;
 
-        default:
-            Platform::Print("ClientGC::HandleMessage: unhandled protobuf message %s\n",
-                MessageName(messageRead.TypeUnmasked()));
+        case k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockRequest:
+            EconPreviewDataBlockRequest(messageRead);
             break;
+
+        case 9129: // k_EMsgGCCStrike15_v2_SetMyMedalsInfo
+        {
+            PlayerMedalsInfo medalsInfo;
+            if (!messageRead.ReadProtobuf(medalsInfo))
+            {
+                Platform::Print("Parsing PlayerMedalsInfo failed, ignoring\n");
+            }
+            break;
+        }
+
+        default:
+        {
+            uint32_t msgType = messageRead.TypeUnmasked();
+            Platform::Print("ClientGC::HandleMessage: unhandled protobuf message (type=%u/0x%X, size=%u) %s\n",
+                msgType, msgType, size, MessageName(msgType));
+            
+            // Print hex dump of first 64 bytes
+            if (size > 0)
+            {
+                const unsigned char *bytes = (const unsigned char *)data;
+                Platform::Print("  Payload hex: ");
+                for (uint32_t i = 0; i < (size < 64 ? size : 64); i++)
+                {
+                    if (i % 16 == 0 && i > 0)
+                        Platform::Print("\n              ");
+                    Platform::Print("%02X ", bytes[i]);
+                }
+                Platform::Print("\n");
+            }
+            
+            // For unknown messages, we just silently ignore them
+            // The game client should handle unknown message types gracefully
+            break;
+        }
         }
     }
     else
     {
+        Platform::Print("  → struct message (case %u)\n", unmaskedType);
         switch (messageRead.TypeUnmasked())
         {
-        case k_EMsgGCDelete:
-            DeleteItem(messageRead);
-            break;
-
         case k_EMsgGCUnlockCrate:
             UnlockCrate(messageRead);
             break;
@@ -106,9 +143,26 @@ void ClientGC::HandleMessage(uint32_t type, const void *data, uint32_t size)
             break;
 
         default:
-            Platform::Print("ClientGC::HandleMessage: unhandled struct message %s\n",
-                MessageName(messageRead.TypeUnmasked()));
+        {
+            uint32_t msgType = messageRead.TypeUnmasked();
+            Platform::Print("ClientGC::HandleMessage: unhandled struct message (type=%u/0x%X, size=%u) %s\n",
+                msgType, msgType, size, MessageName(msgType));
+            
+            // Print hex dump of first 64 bytes
+            if (size > 0)
+            {
+                const unsigned char *bytes = (const unsigned char *)data;
+                Platform::Print("  Payload hex: ");
+                for (uint32_t i = 0; i < (size < 64 ? size : 64); i++)
+                {
+                    if (i % 16 == 0 && i > 0)
+                        Platform::Print("\n              ");
+                    Platform::Print("%02X ", bytes[i]);
+                }
+                Platform::Print("\n");
+            }
             break;
+        }
         }
     }
 }
@@ -137,6 +191,11 @@ void ClientGC::SendSOCacheToGameSever()
 
     GCMessageWrite messageWrite{ k_ESOMsg_CacheSubscribed, message };
     m_networking.SendMessage(messageWrite);
+}
+
+void ClientGC::SetListenServer(ServerGC *serverGC, uint64_t serverSteamId)
+{
+    m_networking.SetListenServer(serverGC, serverSteamId);
 }
 
 void ClientGC::HandleNetMessage(GCMessageRead &messageRead)
@@ -210,12 +269,12 @@ void ClientGC::BuildMatchmakingHello(CMsgGCCStrike15_v2_MatchmakingGC2ClientHell
     message.mutable_global_stats()->set_main_post_url("");
 
     // bullshit
-    message.mutable_global_stats()->set_required_appid_version(13857);
+    message.mutable_global_stats()->set_required_appid_version(0);
     message.mutable_global_stats()->set_pricesheet_version(1680057676); // mikkotodo revisit
     message.mutable_global_stats()->set_twitch_streams_version(2);
     message.mutable_global_stats()->set_active_tournament_eventid(20);
     message.mutable_global_stats()->set_active_survey_id(0);
-    message.mutable_global_stats()->set_required_appid_version2(13862); // csgo s2
+    message.mutable_global_stats()->set_required_appid_version2(0);
 
     message.set_vac_banned(m_config.VacBanned());
     message.mutable_commendation()->set_cmd_friendly(m_config.CommendedFriendly());
@@ -231,6 +290,7 @@ void ClientGC::BuildClientWelcome(CMsgClientWelcome &message, const CMsgCStrike1
     // mikkotodo remove dox
     message.set_version(0); // this is accurate
     message.set_game_data(csWelcome.SerializeAsString());
+    // Keep cache subscription so the client can load inventory.
     m_inventory.BuildCacheSubscription(*message.add_outofdate_subscribed_caches(), m_config.Level(), false);
     message.mutable_location()->set_latitude(65.0133006f);
     message.mutable_location()->set_longitude(25.4646212f);
@@ -287,9 +347,6 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
 
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
 
-    // the real gc sends this a bit later when it has more info to put on it
-    // however we have everything at our fingertips so send it right away
-    // mikkotodo is this even needed? k_EMsgGCClientWelcome should have it all already
     SendMessageToGame(false, k_EMsgGCCStrike15_v2_MatchmakingGC2ClientHello, mmHello);
 
     // send all ranks here as well, it's a bit back and forth with real gc
@@ -509,7 +566,82 @@ void ClientGC::StoreGetUserData(GCMessageRead &messageRead)
     KeyValue priceSheet{ "price_sheet" };
     if (!priceSheet.ParseFromFile("csgo_gc/price_sheet.txt"))
     {
-        return;
+        if (!priceSheet.ParseFromFile("examples/price_sheet.txt"))
+        {
+            return;
+        }
+    }
+
+    KeyValue *store = priceSheet.GetSubkeyMutable("store");
+    if (store)
+    {
+        KeyValue *entries = store->GetSubkeyMutable("entries");
+        KeyValue *banner = store->GetSubkeyMutable("store_banner_layout");
+
+        const KeyValue *templatePrices = nullptr;
+        if (entries)
+        {
+            if (const KeyValue *nameTag = entries->GetSubkey("Name Tag"))
+            {
+                templatePrices = nameTag->GetSubkey("prices");
+            }
+
+            if (!templatePrices)
+            {
+                for (const KeyValue &entry : *entries)
+                {
+                    templatePrices = entry.GetSubkey("prices");
+                    if (templatePrices)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (entries && banner)
+        {
+            for (const KeyValue &bannerItem : *banner)
+            {
+                if (!bannerItem.GetString("market_link").size())
+                {
+                    continue;
+                }
+
+                uint32_t defIndex = FromString<uint32_t>(bannerItem.Name());
+                const ItemInfo *itemInfo = m_inventory.ItemInfoByDefIndex(defIndex);
+                if (!itemInfo || itemInfo->m_name.empty())
+                {
+                    continue;
+                }
+
+                if (!entries->GetSubkey(itemInfo->m_name))
+                {
+                    KeyValue &newEntry = entries->AddSubkey(itemInfo->m_name);
+                    newEntry.AddString("item_link", itemInfo->m_name);
+                    newEntry.AddString("category_tags", "Misc");
+
+                    KeyValue &prices = newEntry.AddSubkey("prices");
+                    if (templatePrices)
+                    {
+                        for (const KeyValue &priceKey : *templatePrices)
+                        {
+                            prices.AddString(priceKey.Name(), priceKey.String());
+                        }
+                    }
+                    else
+                    {
+                        prices.AddString("USD", "1");
+                    }
+                }
+
+                KeyValue *bannerMutable = banner->GetSubkeyMutable(bannerItem.Name());
+                if (bannerMutable)
+                {
+                    bannerMutable->SetString("market_link", "0");
+                }
+            }
+        }
     }
 
     std::string binaryString;
@@ -595,40 +727,60 @@ void ClientGC::StorePurchaseFinalize(GCMessageRead &messageRead)
     m_transaction.id = 0;
 }
 
-
-void ClientGC::DeleteItem(GCMessageRead &messageRead)
+void ClientGC::EconPreviewDataBlockRequest(GCMessageRead &messageRead)
 {
-    // there is data after this, but i don't know what it is
-    uint64_t itemId = messageRead.ReadUint64();
-    if (!messageRead.IsValid())
+    CMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockRequest request;
+    if (!messageRead.ReadProtobuf(request))
     {
-        Platform::Print("Parsing CMsgGCDelete failed, ignoring\n");
+        Platform::Print("Parsing EconPreviewDataBlockRequest failed\n");
         return;
     }
 
-    CMsgSOSingleObject destroyed;
-    if (m_inventory.RemoveItem(itemId, destroyed))
+    uint64_t itemId = request.param_a();
+    Platform::Print("[GC_CLIENT] EconPreviewDataBlockRequest: param_a=%llu\n", itemId);
+
+    CMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockResponse response;
+    if (!m_inventory.GetItemPreviewData(itemId, *response.mutable_iteminfo()))
     {
-        // mikkotodo what does the server want to know
-        SendMessageToGame(true, k_ESOMsg_Destroy, destroyed);
+        Platform::Print("[GC_CLIENT] EconPreviewDataBlockRequest: item %llu not found!\n", itemId);
+        return;
     }
-    else
-    {
-        assert(false);
-    }
+
+    SendMessageToGame(false, k_EMsgGCCStrike15_v2_Client2GCEconPreviewDataBlockResponse, response);
+    Platform::Print("[GC_CLIENT] EconPreviewDataBlockRequest: sent response for item %llu\n", itemId);
 }
 
 void ClientGC::UnlockCrate(GCMessageRead &messageRead)
 {
-    uint64_t keyId = messageRead.ReadUint64();
-    uint64_t crateId = messageRead.ReadUint64();
-    if (!messageRead.IsValid())
+    // Two variants are seen in older builds:
+    //  1) Struct body MsgGCUnlockCrate_t { keyId, crateId }
+    //  2) Header-only where IDs are encoded into job fields
+    // Keep the incoming source job id for response routing when body variant is used.
+    uint64_t requestJobId = messageRead.JobId();
+    uint64_t keyId = 0;
+    uint64_t crateId = 0;
+    bool parsedFromBody = false;
+
+    if (messageRead.RemainingSize() >= sizeof(uint64_t) * 2)
+    {
+        keyId = messageRead.ReadUint64();
+        crateId = messageRead.ReadUint64();
+        parsedFromBody = messageRead.IsValid();
+    }
+
+    if (!parsedFromBody)
+    {
+        keyId = messageRead.JobIdTarget();
+        crateId = messageRead.JobId();
+    }
+
+    if (!messageRead.IsValid() || !keyId || !crateId)
     {
         Platform::Print("Parsing CMsgGCUnlockCrate failed, ignoring\n");
         return;
     }
 
-    Platform::Print("CASE OPENING %llu with %llu\n", crateId, keyId);
+    Platform::Print("CASE OPENING: crateId=%llu, keyId=%llu\n", crateId, keyId);
 
     CMsgSOSingleObject destroyCrate, destroyKey, newItem;
     CMsgGCItemCustomizationNotification notification;
@@ -641,15 +793,41 @@ void ClientGC::UnlockCrate(GCMessageRead &messageRead)
             newItem,
             notification))
     {
-        // mikkotodo what does the server want to know
+        Platform::Print("[GC_CLIENT] UnlockCrate succeeded, sending messages\n");
+
+        // Valve GC proven sequence (mikkokko/csgo_gc):
+        //   1. Destroy crate and key
+        //   2. Create the new item
+        //   3. Send ItemCustomizationNotification (NO DELAY)
+        Platform::Print("[GC_CLIENT] Sending SO updates and notification\n");
+
+        // Send k_EMsgGCUnlockCrateResponse (1008) FIRST.
+        // Body layout matches MsgGCStandardResponse_t: int16 index + uint32 response.
+        // When request had a struct body, route the response using incoming job ID.
+        {
+            GCMessageWrite &responseMsg = parsedFromBody
+                ? m_outgoingMessages.emplace(k_EMsgGCUnlockCrateResponse, requestJobId)
+                : m_outgoingMessages.emplace(k_EMsgGCUnlockCrateResponse);
+            responseMsg.WriteUint16(0);  // m_nResponseIndex = 0
+            responseMsg.WriteUint32(0);  // m_eResponse = k_EGCMsgResponseOK = 0
+        }
+
+        // Destroy consumed items
         SendMessageToGame(true, k_ESOMsg_Destroy, destroyCrate);
-        SendMessageToGame(true, k_ESOMsg_Destroy, destroyKey);
+        if (destroyKey.has_type_id())
+        {
+            SendMessageToGame(true, k_ESOMsg_Destroy, destroyKey);
+        }
+
+        // Create new item
         SendMessageToGame(true, k_ESOMsg_Create, newItem);
 
+        // Notify client immediately (NO delay, NO ShowItemsPickedUp)
         SendMessageToGame(false, k_EMsgGCItemCustomizationNotification, notification);
     }
     else
     {
+        Platform::Print("[GC_CLIENT] ERROR: UnlockCrate failed!\n");
         assert(false);
     }
 }

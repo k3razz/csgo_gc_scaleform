@@ -431,19 +431,6 @@ bool Inventory::EquipItem(uint64_t itemId, uint32_t classId, uint32_t slotId, CM
     }
 }
 
-bool Inventory::RemoveItem(uint64_t itemId, CMsgSOSingleObject &response)
-{
-    auto it = m_items.find(itemId);
-    if (it == m_items.end())
-    {
-        assert(false);
-        return false;
-    }
-
-    DestroyItem(it, response);
-    return true;
-}
-
 bool Inventory::UseItem(uint64_t itemId,
     CMsgSOSingleObject &destroy,
     CMsgSOMultipleObjects &updateMultiple,
@@ -491,12 +478,29 @@ bool Inventory::UnlockCrate(uint64_t crateId,
     CMsgSOSingleObject &newItem,
     CMsgGCItemCustomizationNotification &notification)
 {
+    Platform::Print("[INVENTORY] UnlockCrate: looking for crateId=%llu, keyId=%llu\n", crateId, keyId);
+    Platform::Print("[INVENTORY] Total items in inventory: %zu\n", m_items.size());
+    
+    // Dump first 10 item IDs to help diagnose
+    int count = 0;
+    for (const auto &entry : m_items)
+    {
+        if (count < 10)
+        {
+            Platform::Print("[INVENTORY]   Item[%d]: id=%llu\n", count, entry.first);
+        }
+        count++;
+    }
+    
     auto crate = m_items.find(crateId);
     if (crate == m_items.end())
     {
+        Platform::Print("[INVENTORY] ERROR: crateId %llu not found in inventory!\n", crateId);
         assert(false);
         return false;
     }
+
+    Platform::Print("[INVENTORY] Found crate! Proceeding with case opening.\n");
 
     // CASE OPENING
     CaseOpening caseOpening{ m_itemSchema, m_config, m_random };
@@ -504,31 +508,49 @@ bool Inventory::UnlockCrate(uint64_t crateId,
     CSOEconItem temp;
     if (!caseOpening.SelectItemFromCrate(crate->second, temp))
     {
+        Platform::Print("[INVENTORY] ERROR: SelectItemFromCrate failed!\n");
         assert(false);
         return false;
     }
+    Platform::Print("[INVENTORY] SelectItemFromCrate succeeded, creating item...\n");
 
     CSOEconItem &item = CreateItem(temp);
+    Platform::Print("[INVENTORY] CreateItem returned item with id=%llu\n", item.id());
 
     ToSingleObject(newItem, item);
+    Platform::Print("[INVENTORY] ToSingleObject completed\n");
 
-    // set notification
+    // set notification for case unlock result
+    // Valve format: only include the new item ID, NOT the crate
     notification.add_item_id(item.id());
     notification.set_request(k_EGCItemCustomizationNotification_UnlockCrate);
+    Platform::Print("[INVENTORY] UnlockCrate notification: item_id=%llu\n", item.id());
 
     // remove the crate
     if (m_config.DestroyUsedItems())
     {
+        Platform::Print("[INVENTORY] DestroyUsedItems is enabled\n");
         DestroyItem(crate, destroyCrate);
+        Platform::Print("[INVENTORY] Destroyed crate\n");
 
         // remove the key if one was used (yes, we don't validate keys...)
         auto key = m_items.find(keyId);
         if (key != m_items.end())
         {
             DestroyItem(key, destroyKey);
+            Platform::Print("[INVENTORY] Destroyed key\n");
+        }
+        else
+        {
+            Platform::Print("[INVENTORY] Key not found (keyless case)\n");
         }
     }
+    else
+    {
+        Platform::Print("[INVENTORY] DestroyUsedItems is disabled\n");
+    }
 
+    Platform::Print("[INVENTORY] UnlockCrate returning TRUE\n");
     return true;
 }
 
@@ -1089,6 +1111,24 @@ uint64_t Inventory::PurchaseItem(uint32_t defIndex, std::vector<CMsgSOSingleObje
     ToSingleObject(single, item);
 
     return item.id();
+}
+
+bool Inventory::GetItemPreviewData(uint64_t itemId, CEconItemPreviewDataBlock &block)
+{
+    auto it = m_items.find(itemId);
+    if (it == m_items.end())
+    {
+        Platform::Print("GetItemPreviewData: item %llu not found\n", itemId);
+        return false;
+    }
+
+    ItemToPreviewDataBlock(it->second, block);
+    return true;
+}
+
+const ItemInfo *Inventory::ItemInfoByDefIndex(uint32_t defIndex) const
+{
+    return m_itemSchema.ItemInfoByDefIndex(defIndex);
 }
 
 bool Inventory::UnequipItem(uint64_t itemId, CMsgSOMultipleObjects &update)

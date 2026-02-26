@@ -5,6 +5,7 @@
 class ClientGC;
 class GCMessageRead;
 class GCMessageWrite;
+class ServerGC;
 
 struct AuthTicket
 {
@@ -15,11 +16,14 @@ struct AuthTicket
 class NetworkingClient
 {
 public:
-    NetworkingClient(ClientGC *clientGC, ISteamNetworkingMessages *networkingMessages);
+    NetworkingClient(ClientGC *clientGC, ISteamNetworking *networking);
 
     void Update();
 
     void SendMessage(const GCMessageWrite &message);
+
+    // Listen-server (offline/LAN) mode: bypass P2P, inject directly into ServerGC
+    void SetListenServer(ServerGC *serverGC, uint64_t serverSteamId);
 
     // for gameserver validation
     void SetAuthTicket(uint32_t handle, const void *data, uint32_t size);
@@ -30,18 +34,22 @@ private:
     bool HandleMessage(uint64_t steamId, GCMessageRead &message);
 
     ClientGC *const m_clientGC;
-    ISteamNetworkingMessages *const m_networkingMessages;
+    ISteamNetworking *const m_networking;
     uint64_t m_serverSteamId{};
+
+    // listen-server (offline) mode – bypasses P2P entirely
+    ServerGC *m_listenServerGC{};
+    uint64_t m_listenServerSteamId{};
 
     std::unordered_map<uint32_t, AuthTicket> m_tickets;
 
     STEAM_CALLBACK(NetworkingClient,
         OnSessionRequest,
-        SteamNetworkingMessagesSessionRequest_t,
+        P2PSessionRequest_t,
         m_sessionRequest);
 
     STEAM_CALLBACK(NetworkingClient,
         OnSessionFailed,
-        SteamNetworkingMessagesSessionFailed_t,
+        P2PSessionConnectFail_t,
         m_sessionFailed);
 };

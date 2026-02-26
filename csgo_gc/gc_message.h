@@ -14,6 +14,8 @@ public:
     bool IsProtobuf() const { return m_type & ProtobufMask; }
     uint32_t TypeUnmasked() const { return m_type & ~ProtobufMask; }
     uint64_t JobId() const { return m_jobId; }
+    uint64_t JobIdTarget() const { return m_jobIdTarget; }
+    uint32_t RemainingSize() const { return m_size - m_offset; }
 
     template<typename T>
     bool ReadProtobuf(T &message)
@@ -55,6 +57,7 @@ private:
     const uint32_t m_size;
     uint32_t m_type; // parsed from the message, protobuf mask is kept
     uint64_t m_jobId{ JobIdInvalid };
+    uint64_t m_jobIdTarget{ JobIdInvalid };
 
     // the state
     uint32_t m_offset{};
@@ -69,6 +72,9 @@ public:
 
     // non protobuf messages, data written with the writer functions
     GCMessageWrite(uint32_t type);
+    
+    // non protobuf message response with jobId for routing back to client
+    GCMessageWrite(uint32_t type, uint64_t jobIdSource);
 
     // already serialized data that just gets copied over, type parsed from the message
     GCMessageWrite(const void *data, uint32_t size);

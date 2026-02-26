@@ -390,20 +390,57 @@ const LootList *ItemSchema::GetCrateLootList(uint32_t crateDefIndex) const
     auto itemSearch = m_itemInfo.find(crateDefIndex);
     if (itemSearch == m_itemInfo.end())
     {
+        Platform::Print("[ITEM_SCHEMA] GetCrateLootList: def_index=%u not found\n", crateDefIndex);
         assert(false);
         return nullptr;
     }
 
-    assert(itemSearch->second.m_supplyCrateSeries);
+    const ItemInfo &itemInfo = itemSearch->second;
+    Platform::Print("[ITEM_SCHEMA] GetCrateLootList: def_index=%u name=%s supply_series=%u loot_list_name=%s\n",
+        crateDefIndex,
+        itemInfo.m_name.c_str(),
+        itemInfo.m_supplyCrateSeries,
+        itemInfo.m_lootListName.c_str());
 
-    auto lootListSearch = m_revolvingLootLists.find(itemSearch->second.m_supplyCrateSeries);
-    if (lootListSearch == m_revolvingLootLists.end())
+    if (itemInfo.m_supplyCrateSeries)
     {
-        assert(false);
-        return nullptr;
+        auto lootListSearch = m_revolvingLootLists.find(itemInfo.m_supplyCrateSeries);
+        if (lootListSearch != m_revolvingLootLists.end())
+        {
+            Platform::Print("[ITEM_SCHEMA] GetCrateLootList: using revolving_loot_lists for series=%u\n",
+                itemInfo.m_supplyCrateSeries);
+            return &lootListSearch->second;
+        }
+
+        Platform::Print("[ITEM_SCHEMA] GetCrateLootList: no revolving_loot_lists entry for series=%u\n",
+            itemInfo.m_supplyCrateSeries);
+    }
+    else
+    {
+        Platform::Print("[ITEM_SCHEMA] GetCrateLootList: supply series is 0, skipping revolving_loot_lists\n");
     }
 
-    return &lootListSearch->second;
+    if (!itemInfo.m_lootListName.empty())
+    {
+        auto lootListSearch = m_lootLists.find(itemInfo.m_lootListName);
+        if (lootListSearch != m_lootLists.end())
+        {
+            Platform::Print("[ITEM_SCHEMA] GetCrateLootList: using loot_list_name=%s\n",
+                itemInfo.m_lootListName.c_str());
+            return &lootListSearch->second;
+        }
+
+        Platform::Print("[ITEM_SCHEMA] GetCrateLootList: loot_list_name not found: %s\n",
+            itemInfo.m_lootListName.c_str());
+    }
+    else
+    {
+        Platform::Print("[ITEM_SCHEMA] GetCrateLootList: loot_list_name is empty\n");
+    }
+
+    Platform::Print("[ITEM_SCHEMA] GetCrateLootList: failed to resolve loot list for def_index=%u\n", crateDefIndex);
+    assert(false);
+    return nullptr;
 }
 
 bool ItemSchema::CreateItemFromLootListItem(Random &random,
@@ -629,47 +666,21 @@ static uint32_t ItemQualityFromString(std::string_view name)
     return ItemSchema::QualityUnique; // i guess???
 }
 
-// i hate my life
-static std::vector<std::string_view> SplitString(std::string_view input, char delimiter)
-{
-    size_t offset = 0;
-    std::vector<std::string_view> result;
-
-    while (true)
-    {
-        size_t i = input.find(delimiter, offset);
-        if (i == std::string_view::npos)
-        {
-            result.emplace_back(input.substr(offset));
-            break;
-        }
-
-        result.emplace_back(input.substr(offset, i - offset));
-        offset = i + 1;
-    }
-
-    return result;
-}
-
 void ItemSchema::ParseItemRecursive(ItemInfo &info, const KeyValue &itemKey, const KeyValue *prefabsKey)
 {
-    std::string_view prefabString = itemKey.GetString("prefab");
-    if (prefabString.size() && prefabsKey)
+    std::string_view prefabName = itemKey.GetString("prefab");
+    if (prefabName.size() && prefabsKey)
     {
-        // might have multiple specifications in a single statement
-        std::vector<std::string_view> prefabNames = SplitString(prefabString, ' ');
-        for (std::string_view prefabName : prefabNames)
+        if (prefabName == "valve coupon_prefab")
         {
-            const KeyValue *prefabKey = prefabsKey->GetSubkey(prefabName);
-            if (prefabKey)
-            {
-                ParseItemRecursive(info, *prefabKey, prefabsKey);
-            }
-            else
-            {
-                // not available to us mortals...
-                Platform::Print("No such prefab '%s'\n", std::string{ prefabName }.c_str());
-            }
+            Platform::Print("WARNING: valve coupon_prefab kludge!!!\n");
+            prefabName = "coupon_prefab";
+        }
+
+        const KeyValue *prefabKey = prefabsKey->GetSubkey(prefabName);
+        if (prefabKey)
+        {
+            ParseItemRecursive(info, *prefabKey, prefabsKey);
         }
     }
 
@@ -1037,6 +1048,17 @@ ItemInfo *ItemSchema::ItemInfoByName(std::string_view name)
 
     assert(false);
     return nullptr;
+}
+
+const ItemInfo *ItemSchema::ItemInfoByDefIndex(uint32_t defIndex) const
+{
+    auto it = m_itemInfo.find(defIndex);
+    if (it == m_itemInfo.end())
+    {
+        return nullptr;
+    }
+
+    return &it->second;
 }
 
 StickerKitInfo *ItemSchema::StickerKitInfoByName(std::string_view name)

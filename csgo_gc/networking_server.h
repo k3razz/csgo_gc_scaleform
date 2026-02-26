@@ -7,10 +7,10 @@ class GCMessageWrite;
 class NetworkingServer
 {
 public:
-    NetworkingServer(ISteamNetworkingMessages *networkingMessages);
+    NetworkingServer();
 
-    // caller need to call message->Release() because fuck you
-    bool ReceiveMessage(SteamNetworkingMessage_t *&message);
+    // receive a message, returns true if a message was available
+    bool ReceiveMessage(uint64_t &steamId, std::vector<uint8_t> &data);
 
     void ClientConnected(uint64_t steamId, const void *ticket, uint32_t ticketSize);
     void ClientDisconnected(uint64_t steamId);
@@ -18,16 +18,18 @@ public:
     void SendMessage(uint64_t steamId, const GCMessageWrite &message);
 
 private:
-    ISteamNetworkingMessages *const m_networkingMessages;
+    // fetched lazily because SteamGameServerNetworking() is null at construction time
+    ISteamNetworking *GetNetworking();
+    ISteamNetworking *m_networking{};
     std::unordered_set<uint64_t> m_clients;
 
     STEAM_GAMESERVER_CALLBACK(NetworkingServer,
         OnSessionRequest,
-        SteamNetworkingMessagesSessionRequest_t,
+        P2PSessionRequest_t,
         m_sessionRequest);
 
     STEAM_GAMESERVER_CALLBACK(NetworkingServer,
         OnSessionFailed,
-        SteamNetworkingMessagesSessionFailed_t,
+        P2PSessionConnectFail_t,
         m_sessionFailed);
 };

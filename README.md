@@ -1,4 +1,21 @@
-# csgo_gc
+# csgo_gc_scaleform
+
+> [!WARNING]
+> This is **vibe coded garbage** that kind of works. Spent a night playing around to see if it could work and seems so. 
+> It seems like this works on most versions up to when scaleform was removed. 
+> 
+> download_depot 730 731 7043469183016184477
+> download_depot 730 732 4047004309608881181
+>
+> Seems to loosely work with - the last Scaleform/Panorama build.
+> download_depot 730 731 2666951201135270376
+> download_depot 730 732 5695413866370602519
+>
+> Still major issues and I'm sure the code is 99% garbage. More of a POC that it works.
+>
+> **Scaleform Issues**
+> Cases don't open correctly, UI bugs out half way through.
+> Random delay on Scaleform/Panorama when opening cases.
 
 > [!WARNING]
 > This project is incomplete and not ready for general use.
