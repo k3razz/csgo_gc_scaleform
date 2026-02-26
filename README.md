@@ -15,9 +15,9 @@
 >```
 > Still major issues and I'm sure the code is 99% garbage. More of a POC that it works.
 >
-> **Scaleform Issues**
-> Cases don't open correctly, UI bugs out half way through.
-> Random delay on Scaleform/Panorama when opening cases.
+## **Scaleform Issues**
+- Cases don't open correctly, UI bugs out half way through.
+- Random delay on Scaleform/Panorama when opening cases.
 
 > [!WARNING]
 > This project is incomplete and not ready for general use.
