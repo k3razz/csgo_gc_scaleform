@@ -19,6 +19,8 @@
 - Cases don't open correctly, UI bugs out half way through.
 - Random delay on Scaleform/Panorama when opening cases.
 
+- <img width="1413" height="1217" alt="image" src="https://github.com/user-attachments/assets/688cbeae-fd56-4e1a-8108-6f10f3432ad0" />
+
 > [!WARNING]
 > This project is incomplete and not ready for general use.
 
