@@ -17,8 +17,9 @@ jobs:
         run: mkdir ${{ github.workspace }}\release
 
       - name: Configure CMake
+        shell: cmd
         run: |
-          cmake -A Win32 ^
+          cmake -A Win32 -T v142 ^
             -B ${{ github.workspace }}\build ^
             -S ${{ github.workspace }} ^
             -DCMAKE_BUILD_TYPE=Release ^
