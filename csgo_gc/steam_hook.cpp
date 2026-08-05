@@ -1105,12 +1105,8 @@ private:
 class SteamClientProxy : public ISteamClient
 {
     ISteamClient *m_original{};
-    std::unordered_map<uint64_t, SteamInterfaceProxy> m_proxies;
-    
-    // ============================================================
-    // UNIQUE_PTR ДЛЯ ВСЕХ ПРОКСИ
-    // ============================================================
     std::unique_ptr<SteamAppsProxy> m_steamApps;
+    std::unordered_map<uint64_t, SteamInterfaceProxy> m_proxies;
     std::unique_ptr<SteamGameCoordinatorProxy> m_steamGameCoordinator;
     std::unique_ptr<SteamUtilsProxy> m_steamUtils;
     std::unique_ptr<SteamGameServerProxy> m_steamGameServer;
