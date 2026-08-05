@@ -50,6 +50,11 @@ void ServerGC::HandleMessage(uint32_t type, const void *data, uint32_t size)
             break;
         }
     }
+    else
+    {
+        uint32_t typeUnmasked = messageRead.TypeUnmasked();
+        Platform::Print("[ServerGC] HandleMessage: struct message type=%u\n", typeUnmasked);
+    }
 }
 
 void ServerGC::ClientConnected(uint64_t steamId, const void *ticket, uint32_t ticketSize)
@@ -124,10 +129,25 @@ void ServerGC::HandleNetMessage(uint64_t steamId, const void *data, uint32_t siz
         return;
     }
 
+    uint32_t type = validate.TypeUnmasked();
+    
+    if (type == k_EMsgGCItemCustomizationNotification ||
+        type == k_EMsgGCShowItemsPickedUp ||
+        type == k_EMsgGCStorePurchaseInitResponse ||
+        type == k_EMsgGCStorePurchaseFinalizeResponse ||
+        type == k_EMsgGCUnlockCrateResponse ||
+        type == k_EMsgGCNameItemNotification ||
+        type == k_EMsgGCUseItemResponse ||
+        type == k_EMsgGCCraftResponse)
+    {
+        Platform::Print("[ServerGC] Blocked echo of notification message %u from %llu\n", type, steamId);
+        return;
+    }
+
     // validate the type and contents
     bool isValid = false;
 
-    switch (validate.TypeUnmasked())
+    switch (type)
     {
     case k_ESOMsg_Create:
     case k_ESOMsg_Update:
