@@ -1058,7 +1058,7 @@ public:
     {
     }
 
-     void *GetInterface(const char *version, void *original)
+    void *GetInterface(const char *version, void *original)
     {
         if (InterfaceMatches(version, STEAMGAMECOORDINATOR_INTERFACE_VERSION))
         {
@@ -1071,7 +1071,7 @@ public:
         }
         else if (InterfaceMatches(version, STEAMUTILS_INTERFACE_VERSION))
         {
-            return GetOrCreate<ISteamApps>(m_steamApps, static_cast<ISteamApps *>(original));
+            return GetOrCreate<ISteamUtils>(m_steamUtils, static_cast<ISteamUtils *>(original));
         }
         else if (InterfaceMatches(version, STEAMGAMESERVER_INTERFACE_VERSION))
         {
@@ -1089,12 +1089,13 @@ public:
         {
             return GetOrCreate<ISteamApps>(m_steamApps, static_cast<ISteamApps *>(original));
         }
-    
+
         return nullptr;
     }
+
 private:
     const HSteamPipe m_pipe;
-
+    std::unique_ptr<SteamAppsProxy> m_steamApps;
     std::unique_ptr<SteamGameCoordinatorProxy> m_steamGameCoordinator;
     std::unique_ptr<SteamUtilsProxy> m_steamUtils;
     std::unique_ptr<SteamGameServerProxy> m_steamGameServer;
