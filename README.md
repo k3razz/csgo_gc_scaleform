@@ -1,15 +1,15 @@
-
 # csgo_gc_scaleform
 
 > [!WARNING]
-> This is **vibe coded garbage** that kind of works. Spent a night playing around to see if it could work and seems so. 
-> It seems like this works on most versions up to when scaleform was removed. 
+> Это – **вайб коднутый** форк. Я потратил около ночи чтобы проверить критичные баги.
+> Как будто бы работает на версиях вплоть до тех, где удалили scaleform
+> 
 >
 > ```
 > download_depot 730 731 7043469183016184477
 > download_depot 730 732 4047004309608881181
 >```
-> Seems to loosely work with - the last Scaleform/Panorama build.
+> Приблизительно версия, которая работает с scaleform/panorama
 > ```
 > download_depot 730 731 2666951201135270376
 > download_depot 730 732 5695413866370602519
