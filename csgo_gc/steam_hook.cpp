@@ -632,27 +632,6 @@ public:
         return m_original->BIsAppInstalled(appID);
     }
 
-    bool GetAppOwnershipTicketExtendedData(uint32 nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId, uint32 *piSteamId) override
-    {
-        if (nAppID == 730)
-        {
-            if (piAppId) *piAppId = 730;
-            if (piSteamId) *piSteamId = 0;
-            return true;
-        }
-        return m_original->GetAppOwnershipTicketExtendedData(nAppID, pvBuffer, cbBufferLength, piAppId, piSteamId);
-    }
-
-    uint32 GetAppOwnershipTicket(AppId_t nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId) override
-    {
-        if (nAppID == 730)
-        {
-            if (piAppId) *piAppId = 730;
-            return 0;
-        }
-        return m_original->GetAppOwnershipTicket(nAppID, pvBuffer, cbBufferLength, piAppId);
-    }
-
     uint32 GetAppData(AppId_t nAppID, const char *pchKey, char *pchValue, int cchValueMax) override
     {
         return m_original->GetAppData(nAppID, pchKey, pchValue, cchValueMax);
@@ -673,7 +652,7 @@ public:
         return m_original->BIsDlcInstalled(nAppID);
     }
 
-    int GetEarliestPurchaseUnixTime(AppId_t nAppID) override
+    uint32 GetEarliestPurchaseUnixTime(AppId_t nAppID) override
     {
         return m_original->GetEarliestPurchaseUnixTime(nAppID);
     }
@@ -681,11 +660,6 @@ public:
     bool BIsVACBanned() override
     {
         return m_original->BIsVACBanned();
-    }
-
-    int GetCurrentGameLanguage(char *pchLanguage, int cchLanguageBufferSize) override
-    {
-        return m_original->GetCurrentGameLanguage(pchLanguage, cchLanguageBufferSize);
     }
 
     const char *GetCurrentGameLanguage() override
@@ -711,11 +685,6 @@ public:
     const char *GetLaunchQueryParam(const char *pchKey) override
     {
         return m_original->GetLaunchQueryParam(pchKey);
-    }
-
-    bool BGetAchievementProgressStatus(const char *pchAchievementName, int64 *pnUnlocked) override
-    {
-        return m_original->BGetAchievementProgressStatus(pchAchievementName, pnUnlocked);
     }
 
     SteamAPICall_t GetFileDetails(const char *pszFileName) override
@@ -745,10 +714,6 @@ public:
 
     bool GetAppInstallDir(AppId_t nAppID, char *pchDir, int cbDir) override
     {
-        if (nAppID == 730)
-        {
-            return m_original->GetAppInstallDir(nAppID, pchDir, cbDir);
-        }
         return m_original->GetAppInstallDir(nAppID, pchDir, cbDir);
     }
 };
@@ -1081,7 +1046,7 @@ public:
         }
         else if (InterfaceMatches(version, STEAMUTILS_INTERFACE_VERSION))
         {
-            return GetOrCreate<ISteamUtils>(m_steamUtils, static_cast<ISteamUtils *>(original));
+            return GetOrCreate<ISteamApps>(m_steamApps, static_cast<ISteamApps *>(original));
         }
         else if (InterfaceMatches(version, STEAMGAMESERVER_INTERFACE_VERSION))
         {
@@ -1251,11 +1216,6 @@ public:
     ISteamGameServerStats *GetISteamGameServerStats(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
         return PROXY_INTERFACE(GetISteamGameServerStats, hSteamuser, hSteamPipe, pchVersion);
-    }
-
-    ISteamApps *GetISteamApps(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
-    {
-        return PROXY_INTERFACE(GetISteamApps, hSteamUser, hSteamPipe, pchVersion);
     }
 
     ISteamNetworking *GetISteamNetworking(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
