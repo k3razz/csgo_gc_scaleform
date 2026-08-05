@@ -1068,18 +1068,15 @@ public:
     {
     }
 
-    void *GetInterface(const char *version, void *original)
+     void *GetInterface(const char *version, void *original)
     {
         if (InterfaceMatches(version, STEAMGAMECOORDINATOR_INTERFACE_VERSION))
         {
-            // pass 0 as steamid for servers so the wrapper knows it's for a server
             uint64_t steamId = 0;
-
             if (SteamGameServer_GetHSteamPipe() != m_pipe)
             {
                 steamId = SteamUser()->GetSteamID().ConvertToUint64();
             }
-
             return GetOrCreate<ISteamGameCoordinator>(m_steamGameCoordinator, steamId);
         }
         else if (InterfaceMatches(version, STEAMUTILS_INTERFACE_VERSION))
@@ -1098,10 +1095,13 @@ public:
         {
             return GetOrCreate<ISteamMatchmakingServers>(m_steamMatchmakingServers, static_cast<ISteamMatchmakingServers *>(original));
         }
-
+        else if (InterfaceMatches(version, STEAMAPPS_INTERFACE_VERSION))
+        {
+            return GetOrCreate<ISteamApps>(m_steamApps, static_cast<ISteamApps *>(original));
+        }
+    
         return nullptr;
     }
-
 private:
     const HSteamPipe m_pipe;
 
@@ -1115,7 +1115,12 @@ private:
 class SteamClientProxy : public ISteamClient
 {
     ISteamClient *m_original{};
+    ISteamApps *GetISteamApps(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    {
+        return PROXY_INTERFACE(GetISteamApps, hSteamUser, hSteamPipe, pchVersion);
+    }
     std::unordered_map<uint64_t, SteamInterfaceProxy> m_proxies;
+    std::unique_ptr<SteamAppsProxy> m_steamApps;
 
     uint64_t ProxyKey(HSteamPipe pipe, HSteamUser user)
     {
