@@ -713,6 +713,10 @@ public:
 
     EUserHasLicenseForAppResult UserHasLicenseForApp(CSteamID steamID, AppId_t appID) override
     {
+        if (appID == 730)
+        {
+            return k_EUserHasLicenseResultHasLicense;
+        }
         return m_original->UserHasLicenseForApp(steamID, appID);
     }
 
@@ -1353,7 +1357,6 @@ static void Hk_SteamAPI_RunCallbacks()
 
     if (s_clientGC)
     {
-        // run client gc callbacks
         uint32_t messageSize;
         if (s_clientGC->HasOutgoingMessages(messageSize))
         {
@@ -1363,12 +1366,11 @@ static void Hk_SteamAPI_RunCallbacks()
         }
 
         MicroTxnAuthorizationResponse_t response;
-        if (s_clientGC->GetMicroTransactionResponse(response))
-        {
-            s_callbackHooks.RunCallback(false, MicroTxnAuthorizationResponse_t::k_iCallback, &response);
-        }
+        response.m_unAppID = 730;
+        response.m_ulOrderID = 0;
+        response.m_bAuthorized = 1;
+        s_callbackHooks.RunCallback(false, MicroTxnAuthorizationResponse_t::k_iCallback, &response);
 
-        // do networking stuff
         s_clientGC->Update();
     }
 }
