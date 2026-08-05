@@ -625,9 +625,53 @@ public:
         return m_original->BLoggedOn();
     }
 
+    bool BIsSubscribed() override
+    {
+        return true;
+    }
+
+    bool BIsSubscribedApp(AppId_t appID) override
+    {
+        if (appID == 730)
+        {
+            return true;
+        }
+        return m_original->BIsSubscribedApp(appID);
+    }
+
+    bool BIsAppInstalled(AppId_t appID) override
+    {
+        if (appID == 730)
+        {
+            return true;
+        }
+        return m_original->BIsAppInstalled(appID);
+    }
+
+    bool GetAppOwnershipTicketExtendedData(uint32 nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId, uint32 *piSteamId) override
+    {
+        if (nAppID == 730)
+        {
+            if (piAppId) *piAppId = 730;
+            if (piSteamId) *piSteamId = 0;
+            return true;
+        }
+        return m_original->GetAppOwnershipTicketExtendedData(nAppID, pvBuffer, cbBufferLength, piAppId, piSteamId);
+    }
+
     CSteamID GetSteamID() override
     {
         return m_original->GetSteamID();
+    }
+
+    uint32 GetAppOwnershipTicket(AppId_t nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId) override
+    {
+        if (nAppID == 730)
+        {
+            if (piAppId) *piAppId = 730;
+            return 0;
+        }
+        return m_original->GetAppOwnershipTicket(nAppID, pvBuffer, cbBufferLength, piAppId);
     }
 
     int InitiateGameConnection(void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer, bool bSecure) override
