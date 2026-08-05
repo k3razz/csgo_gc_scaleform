@@ -330,16 +330,10 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
 {
     Platform::Print("[GC] OnClientHello: received ClientHello\n");
 
-    CMsgClientHello hello;
-    if (!messageRead.ReadProtobuf(hello))
-    {
-        Platform::Print("[GC] OnClientHello: failed to parse ClientHello, continuing anyway\n");
-    }
-
     CMsgClientWelcome clientWelcome;
     clientWelcome.set_version(0);
     clientWelcome.set_rtime32_gc_welcome_timestamp(static_cast<uint32_t>(time(nullptr)));
-    clientWelcome.set_currency(1);     // Доллары США
+    clientWelcome.set_currency(1);
     clientWelcome.set_txn_country_code("US");
 
     CMsgCStrike15Welcome csWelcome;
@@ -349,18 +343,15 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     csWelcome.set_last_time_played(1680260376);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
 
-    m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
+    static bool inventorySent = false;
+    if (!inventorySent)
+    {
+        m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
+        inventorySent = true;
+    }
 
-    CMsgGCCStrike15_v2_MatchmakingGC2ClientHello mmHello;
-    BuildMatchmakingHello(mmHello);
-    clientWelcome.set_game_data2(mmHello.SerializeAsString());
-    
-    Platform::Print("[GC] OnClientHello: sending ClientWelcome with inventory\n");
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
-
     SendRankUpdate();
-
-    Platform::Print("[GC] OnClientHello: ClientWelcome sent successfully\n");
 }
 
 void ClientGC::AdjustItemEquippedState(GCMessageRead &messageRead)
@@ -762,10 +753,15 @@ void ClientGC::EconPreviewDataBlockRequest(GCMessageRead &messageRead)
 
 void ClientGC::UnlockCrate(GCMessageRead &messageRead)
 {
-    // Two variants are seen in older builds:
-    //  1) Struct body MsgGCUnlockCrate_t { keyId, crateId }
-    //  2) Header-only where IDs are encoded into job fields
-    // Keep the incoming source job id for response routing when body variant is used.
+    static int unlockCount = 0;
+    unlockCount++;
+    
+    if (unlockCount > 1)
+    {
+        Platform::Print("[GC_CLIENT] UnlockCrate: already processed %d times, ignoring\n", unlockCount);
+        return;
+    }
+
     uint64_t requestJobId = messageRead.JobId();
     uint64_t keyId = 0;
     uint64_t crateId = 0;
@@ -786,40 +782,26 @@ void ClientGC::UnlockCrate(GCMessageRead &messageRead)
 
     if (!messageRead.IsValid() || !keyId || !crateId)
     {
-        Platform::Print("Parsing CMsgGCUnlockCrate failed, ignoring\n");
+        Platform::Print("[GC_CLIENT] UnlockCrate: parsing failed, ignoring\n");
         return;
     }
 
-    Platform::Print("CASE OPENING: crateId=%llu, keyId=%llu\n", crateId, keyId);
+    Platform::Print("[GC_CLIENT] UnlockCrate: crateId=%llu, keyId=%llu (attempt %d)\n", crateId, keyId, unlockCount);
 
     CMsgSOSingleObject destroyCrate, destroyKey, newItem;
     CMsgGCItemCustomizationNotification notification;
 
-    if (m_inventory.UnlockCrate(
-            crateId,
-            keyId,
-            destroyCrate,
-            destroyKey,
-            newItem,
-            notification))
+    if (m_inventory.UnlockCrate(crateId, keyId, destroyCrate, destroyKey, newItem, notification))
     {
-        Platform::Print("[GC_CLIENT] UnlockCrate succeeded, sending messages\n");
+        Platform::Print("[GC_CLIENT] UnlockCrate succeeded\n");
 
-        // Valve GC proven sequence (mikkokko/csgo_gc):
-        //   1. Destroy crate and key
-        //   2. Create the new item
-        //   3. Send ItemCustomizationNotification (NO DELAY)
-        Platform::Print("[GC_CLIENT] Sending SO updates and notification\n");
-
-        // Send k_EMsgGCUnlockCrateResponse (1008) FIRST.
-        // Body layout matches MsgGCStandardResponse_t: int16 index + uint32 response.
-        // When request had a struct body, route the response using incoming job ID.
+        // Send response
         {
             GCMessageWrite &responseMsg = parsedFromBody
                 ? m_outgoingMessages.emplace(k_EMsgGCUnlockCrateResponse, requestJobId)
                 : m_outgoingMessages.emplace(k_EMsgGCUnlockCrateResponse);
-            responseMsg.WriteUint16(0);  // m_nResponseIndex = 0
-            responseMsg.WriteUint32(0);  // m_eResponse = k_EGCMsgResponseOK = 0
+            responseMsg.WriteUint16(0);
+            responseMsg.WriteUint32(0);
         }
 
         // Destroy consumed items
@@ -832,13 +814,14 @@ void ClientGC::UnlockCrate(GCMessageRead &messageRead)
         // Create new item
         SendMessageToGame(true, k_ESOMsg_Create, newItem);
 
-        // Notify client immediately (NO delay, NO ShowItemsPickedUp)
+        // Notify client
         SendMessageToGame(false, k_EMsgGCItemCustomizationNotification, notification);
+        
+        Platform::Print("[GC_CLIENT] UnlockCrate: completed\n");
     }
     else
     {
-        Platform::Print("[GC_CLIENT] ERROR: UnlockCrate failed!\n");
-        assert(false);
+        Platform::Print("[GC_CLIENT] UnlockCrate: FAILED!\n");
     }
 }
 
