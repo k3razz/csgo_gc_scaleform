@@ -605,6 +605,154 @@ public:
     }
 };
 
+class SteamAppsProxy : public ISteamApps
+{
+    ISteamApps *m_original;
+
+public:
+    SteamAppsProxy(ISteamApps *original)
+        : m_original{ original }
+    {
+    }
+
+    bool BIsSubscribed() override
+    {
+        return true;
+    }
+
+    bool BIsSubscribedApp(AppId_t appID) override
+    {
+        if (appID == 730) return true;
+        return m_original->BIsSubscribedApp(appID);
+    }
+
+    bool BIsAppInstalled(AppId_t appID) override
+    {
+        if (appID == 730) return true;
+        return m_original->BIsAppInstalled(appID);
+    }
+
+    bool GetAppOwnershipTicketExtendedData(uint32 nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId, uint32 *piSteamId) override
+    {
+        if (nAppID == 730)
+        {
+            if (piAppId) *piAppId = 730;
+            if (piSteamId) *piSteamId = 0;
+            return true;
+        }
+        return m_original->GetAppOwnershipTicketExtendedData(nAppID, pvBuffer, cbBufferLength, piAppId, piSteamId);
+    }
+
+    uint32 GetAppOwnershipTicket(AppId_t nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId) override
+    {
+        if (nAppID == 730)
+        {
+            if (piAppId) *piAppId = 730;
+            return 0;
+        }
+        return m_original->GetAppOwnershipTicket(nAppID, pvBuffer, cbBufferLength, piAppId);
+    }
+
+    uint32 GetAppData(AppId_t nAppID, const char *pchKey, char *pchValue, int cchValueMax) override
+    {
+        return m_original->GetAppData(nAppID, pchKey, pchValue, cchValueMax);
+    }
+
+    bool BGetDLCDataByIndex(int iDLC, AppId_t *pAppID, bool *pbAvailable, char *pchName, int cchNameBufferSize) override
+    {
+        return m_original->BGetDLCDataByIndex(iDLC, pAppID, pbAvailable, pchName, cchNameBufferSize);
+    }
+
+    int GetDLCCount() override
+    {
+        return m_original->GetDLCCount();
+    }
+
+    bool BIsDlcInstalled(AppId_t nAppID) override
+    {
+        return m_original->BIsDlcInstalled(nAppID);
+    }
+
+    int GetEarliestPurchaseUnixTime(AppId_t nAppID) override
+    {
+        return m_original->GetEarliestPurchaseUnixTime(nAppID);
+    }
+
+    bool BIsVACBanned() override
+    {
+        return m_original->BIsVACBanned();
+    }
+
+    int GetCurrentGameLanguage(char *pchLanguage, int cchLanguageBufferSize) override
+    {
+        return m_original->GetCurrentGameLanguage(pchLanguage, cchLanguageBufferSize);
+    }
+
+    const char *GetCurrentGameLanguage() override
+    {
+        return m_original->GetCurrentGameLanguage();
+    }
+
+    bool BIsCybercafe() override
+    {
+        return m_original->BIsCybercafe();
+    }
+
+    bool BIsLowViolence() override
+    {
+        return m_original->BIsLowViolence();
+    }
+
+    const char *GetAvailableGameLanguages() override
+    {
+        return m_original->GetAvailableGameLanguages();
+    }
+
+    const char *GetLaunchQueryParam(const char *pchKey) override
+    {
+        return m_original->GetLaunchQueryParam(pchKey);
+    }
+
+    bool BGetAchievementProgressStatus(const char *pchAchievementName, int64 *pnUnlocked) override
+    {
+        return m_original->BGetAchievementProgressStatus(pchAchievementName, pnUnlocked);
+    }
+
+    SteamAPICall_t GetFileDetails(const char *pszFileName) override
+    {
+        return m_original->GetFileDetails(pszFileName);
+    }
+
+    int GetNumDlcInstalled() override
+    {
+        return m_original->GetNumDlcInstalled();
+    }
+
+    const char *GetInstalledDLCName(int iIndex) override
+    {
+        return m_original->GetInstalledDLCName(iIndex);
+    }
+
+    AppId_t GetInstalledDLC(int iIndex) override
+    {
+        return m_original->GetInstalledDLC(iIndex);
+    }
+
+    int GetDLCDownloadProgress(AppId_t nAppID, uint64 *puBytesDownloaded, uint64 *puBytesTotal) override
+    {
+        return m_original->GetDLCDownloadProgress(nAppID, puBytesDownloaded, puBytesTotal);
+    }
+
+    bool GetAppInstallDir(AppId_t nAppID, char *pchDir, int cbDir) override
+    {
+        if (nAppID == 730)
+        {
+            return m_original->GetAppInstallDir(nAppID, pchDir, cbDir);
+        }
+        return m_original->GetAppInstallDir(nAppID, pchDir, cbDir);
+    }
+};
+
 class SteamUserProxy : public ISteamUser
 {
     ISteamUser *m_original;
@@ -625,59 +773,6 @@ public:
         return m_original->BLoggedOn();
     }
 
-    bool BIsSubscribed() override
-    {
-        return true;
-    }
-
-    bool BIsSubscribedApp(AppId_t appID) override
-    {
-        if (appID == 730)
-        {
-            return true;
-        }
-        return m_original->BIsSubscribedApp(appID);
-    }
-
-    bool BIsAppInstalled(AppId_t appID) override
-    {
-        if (appID == 730)
-        {
-            return true;
-        }
-        return m_original->BIsAppInstalled(appID);
-    }
-
-    bool GetAppOwnershipTicketExtendedData(uint32 nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId, uint32 *piSteamId) override
-    {
-        if (nAppID == 730)
-        {
-            if (piAppId) *piAppId = 730;
-            if (piSteamId) *piSteamId = 0;
-            return true;
-        }
-        return m_original->GetAppOwnershipTicketExtendedData(nAppID, pvBuffer, cbBufferLength, piAppId, piSteamId);
-    }
-
-    CSteamID GetSteamID() override
-    {
-        return m_original->GetSteamID();
-    }
-
-    uint32 GetAppOwnershipTicket(AppId_t nAppID, void *pvBuffer, uint32 cbBufferLength, uint32 *piAppId) override
-    {
-        if (nAppID == 730)
-        {
-            if (piAppId) *piAppId = 730;
-            return 0;
-        }
-        return m_original->GetAppOwnershipTicket(nAppID, pvBuffer, cbBufferLength, piAppId);
-    }
-
-    int InitiateGameConnection(void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer, bool bSecure) override
-    {
-        return m_original->InitiateGameConnection(pAuthBlob, cbMaxAuthBlob, steamIDGameServer, unIPServer, usPortServer, bSecure);
-    }
 
     void TerminateGameConnection(uint32 unIPServer, uint16 usPortServer) override
     {
