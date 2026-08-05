@@ -615,13 +615,9 @@ public:
     {
     }
 
-    // ============================================================
-    // ОБХОД ЛИЦЕНЗИИ - CS:GO (appID 730)
-    // ============================================================
-
     bool BIsSubscribed() override
     {
-        return true;  // Всегда подписан
+        return true;
     }
 
     bool BIsSubscribedApp(AppId_t appID) override
@@ -636,33 +632,14 @@ public:
         return m_original->BIsAppInstalled(appID);
     }
 
-    // ============================================================
-    // ОСТАЛЬНЫЕ МЕТОДЫ (только те, что есть в твоём SDK)
-    // ============================================================
-
-    uint32 GetAppData(AppId_t nAppID, const char *pchKey, char *pchValue, int cchValueMax) override
+    bool BIsLowViolence() override
     {
-        return m_original->GetAppData(nAppID, pchKey, pchValue, cchValueMax);
+        return m_original->BIsLowViolence();
     }
 
-    bool BGetDLCDataByIndex(int iDLC, AppId_t *pAppID, bool *pbAvailable, char *pchName, int cchNameBufferSize) override
+    bool BIsCybercafe() override
     {
-        return m_original->BGetDLCDataByIndex(iDLC, pAppID, pbAvailable, pchName, cchNameBufferSize);
-    }
-
-    int GetDLCCount() override
-    {
-        return m_original->GetDLCCount();
-    }
-
-    bool BIsDlcInstalled(AppId_t nAppID) override
-    {
-        return m_original->BIsDlcInstalled(nAppID);
-    }
-
-    uint32 GetEarliestPurchaseUnixTime(AppId_t nAppID) override
-    {
-        return m_original->GetEarliestPurchaseUnixTime(nAppID);
+        return m_original->BIsCybercafe();
     }
 
     bool BIsVACBanned() override
@@ -675,24 +652,94 @@ public:
         return m_original->GetCurrentGameLanguage();
     }
 
-    bool BIsCybercafe() override
-    {
-        return m_original->BIsCybercafe();
-    }
-
-    bool BIsLowViolence() override
-    {
-        return m_original->BIsLowViolence();
-    }
-
     const char *GetAvailableGameLanguages() override
     {
         return m_original->GetAvailableGameLanguages();
     }
 
+    bool BIsDlcInstalled(AppId_t appID) override
+    {
+        return m_original->BIsDlcInstalled(appID);
+    }
+
+    uint32 GetEarliestPurchaseUnixTime(AppId_t nAppID) override
+    {
+        return m_original->GetEarliestPurchaseUnixTime(nAppID);
+    }
+
+    bool BIsSubscribedFromFreeWeekend() override
+    {
+        return m_original->BIsSubscribedFromFreeWeekend();
+    }
+
+    int GetDLCCount() override
+    {
+        return m_original->GetDLCCount();
+    }
+
+    bool BGetDLCDataByIndex(int iDLC, AppId_t *pAppID, bool *pbAvailable, char *pchName, int cchNameBufferSize) override
+    {
+        return m_original->BGetDLCDataByIndex(iDLC, pAppID, pbAvailable, pchName, cchNameBufferSize);
+    }
+
+    void InstallDLC(AppId_t nAppID) override
+    {
+        m_original->InstallDLC(nAppID);
+    }
+
+    void UninstallDLC(AppId_t nAppID) override
+    {
+        m_original->UninstallDLC(nAppID);
+    }
+
+    void RequestAppProofOfPurchaseKey(AppId_t nAppID) override
+    {
+        m_original->RequestAppProofOfPurchaseKey(nAppID);
+    }
+
+    bool GetCurrentBetaName(char *pchName, int cchNameBufferSize) override
+    {
+        return m_original->GetCurrentBetaName(pchName, cchNameBufferSize);
+    }
+
+    bool MarkContentCorrupt(bool bMissingFilesOnly) override
+    {
+        return m_original->MarkContentCorrupt(bMissingFilesOnly);
+    }
+
+    uint32 GetInstalledDepots(AppId_t appID, DepotId_t *pvecDepots, uint32 cMaxDepots) override
+    {
+        return m_original->GetInstalledDepots(appID, pvecDepots, cMaxDepots);
+    }
+
+    uint32 GetAppInstallDir(AppId_t appID, char *pchFolder, uint32 cchFolderBufferSize) override
+    {
+        return m_original->GetAppInstallDir(appID, pchFolder, cchFolderBufferSize);
+    }
+
+    CSteamID GetAppOwner() override
+    {
+        return m_original->GetAppOwner();
+    }
+
     const char *GetLaunchQueryParam(const char *pchKey) override
     {
         return m_original->GetLaunchQueryParam(pchKey);
+    }
+
+    bool GetDlcDownloadProgress(AppId_t nAppID, uint64 *punBytesDownloaded, uint64 *punBytesTotal) override
+    {
+        return m_original->GetDlcDownloadProgress(nAppID, punBytesDownloaded, punBytesTotal);
+    }
+
+    int GetAppBuildId() override
+    {
+        return m_original->GetAppBuildId();
+    }
+
+    void RequestAllProofOfPurchaseKeys() override
+    {
+        m_original->RequestAllProofOfPurchaseKeys();
     }
 };
 
