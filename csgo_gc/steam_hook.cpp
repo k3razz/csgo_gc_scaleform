@@ -1105,12 +1105,17 @@ private:
 class SteamClientProxy : public ISteamClient
 {
     ISteamClient *m_original{};
-    ISteamApps *GetISteamApps(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
-    {
-        return PROXY_INTERFACE(GetISteamApps, hSteamUser, hSteamPipe, pchVersion);
-    }
     std::unordered_map<uint64_t, SteamInterfaceProxy> m_proxies;
+    
+    // ============================================================
+    // UNIQUE_PTR ДЛЯ ВСЕХ ПРОКСИ
+    // ============================================================
     std::unique_ptr<SteamAppsProxy> m_steamApps;
+    std::unique_ptr<SteamGameCoordinatorProxy> m_steamGameCoordinator;
+    std::unique_ptr<SteamUtilsProxy> m_steamUtils;
+    std::unique_ptr<SteamGameServerProxy> m_steamGameServer;
+    std::unique_ptr<SteamUserProxy> m_steamUser;
+    std::unique_ptr<SteamMatchmakingServersProxy> m_steamMatchmakingServers;
 
     uint64_t ProxyKey(HSteamPipe pipe, HSteamUser user)
     {
@@ -1139,6 +1144,17 @@ class SteamClientProxy : public ISteamClient
         }
     }
 
+    template<typename T>
+    T *ProxyInterface(T *original, HSteamUser user, HSteamPipe pipe, const char *version, bool allowNoUser = false)
+    {
+        SteamInterfaceProxy &proxy = GetProxy(pipe, user, allowNoUser);
+        T *result = static_cast<T *>(proxy.GetInterface(version, original));
+        return result ? result : original;
+    }
+
+#define PROXY_INTERFACE(func, user, pipe, version, ...) \
+    ProxyInterface(m_original->func(user, pipe, version), user, pipe, version, ##__VA_ARGS__)
+
 public:
     void SetOriginal(ISteamClient *original)
     {
@@ -1148,7 +1164,6 @@ public:
 
     ~SteamClientProxy()
     {
-        // debug schizo
         assert(m_proxies.empty());
     }
 
@@ -1159,9 +1174,7 @@ public:
 
     bool BReleaseSteamPipe(HSteamPipe hSteamPipe) override
     {
-        // remove proxies not tied to a specific user, e.g. ISteamUtils
         RemoveProxy(hSteamPipe, 0);
-
         return m_original->BReleaseSteamPipe(hSteamPipe);
     }
 
@@ -1178,20 +1191,12 @@ public:
     void ReleaseUser(HSteamPipe hSteamPipe, HSteamUser hUser) override
     {
         RemoveProxy(hSteamPipe, hUser);
-
         m_original->ReleaseUser(hSteamPipe, hUser);
     }
 
-    template<typename T>
-    T *ProxyInterface(T *original, HSteamUser user, HSteamPipe pipe, const char *version, bool allowNoUser = false)
-    {
-        SteamInterfaceProxy &proxy = GetProxy(pipe, user, allowNoUser);
-        T *result = static_cast<T *>(proxy.GetInterface(version, original));
-        return result ? result : original;
-    }
-
-    // temp macro
-#define PROXY_INTERFACE(func, user, pipe, version, ...) ProxyInterface(m_original->func(user, pipe, version), user, pipe, version, ##__VA_ARGS__)
+    // ============================================================
+    // ВСЕ GET-МЕТОДЫ ИСПОЛЬЗУЮТ PROXY_INTERFACE
+    // ============================================================
 
     ISteamUser *GetISteamUser(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
@@ -1201,11 +1206,6 @@ public:
     ISteamGameServer *GetISteamGameServer(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
         return PROXY_INTERFACE(GetISteamGameServer, hSteamUser, hSteamPipe, pchVersion);
-    }
-
-    void SetLocalIPBinding(uint32 unIP, uint16 usPort) override
-    {
-        m_original->SetLocalIPBinding(unIP, usPort);
     }
 
     ISteamFriends *GetISteamFriends(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
@@ -1228,9 +1228,9 @@ public:
         return PROXY_INTERFACE(GetISteamMatchmakingServers, hSteamUser, hSteamPipe, pchVersion);
     }
 
-    void *GetISteamGenericInterface(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    ISteamApps *GetISteamApps(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
-        return PROXY_INTERFACE(GetISteamGenericInterface, hSteamUser, hSteamPipe, pchVersion, true);
+        return PROXY_INTERFACE(GetISteamApps, hSteamUser, hSteamPipe, pchVersion);
     }
 
     ISteamUserStats *GetISteamUserStats(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
@@ -1256,21 +1256,6 @@ public:
     ISteamScreenshots *GetISteamScreenshots(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
     {
         return PROXY_INTERFACE(GetISteamScreenshots, hSteamuser, hSteamPipe, pchVersion);
-    }
-
-    uint32 GetIPCCallCount() override
-    {
-        return m_original->GetIPCCallCount();
-    }
-
-    void SetWarningMessageHook(SteamAPIWarningMessageHook_t pFunction) override
-    {
-        m_original->SetWarningMessageHook(pFunction);
-    }
-
-    bool BShutdownIfAllPipesClosed() override
-    {
-        return m_original->BShutdownIfAllPipesClosed();
     }
 
     ISteamHTTP *GetISteamHTTP(HSteamUser hSteamuser, HSteamPipe hSteamPipe, const char *pchVersion) override
@@ -1323,25 +1308,50 @@ public:
         return PROXY_INTERFACE(GetISteamVideo, hSteamuser, hSteamPipe, pchVersion);
     }
 
+    // ============================================================
+    // ОСТАЛЬНЫЕ МЕТОДЫ
+    // ============================================================
+
+    void *GetISteamGenericInterface(HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion) override
+    {
+        return PROXY_INTERFACE(GetISteamGenericInterface, hSteamUser, hSteamPipe, pchVersion, true);
+    }
+
+    void SetLocalIPBinding(uint32 unIP, uint16 usPort) override
+    {
+        m_original->SetLocalIPBinding(unIP, usPort);
+    }
+
+    uint32 GetIPCCallCount() override
+    {
+        return m_original->GetIPCCallCount();
+    }
+
+    void SetWarningMessageHook(SteamAPIWarningMessageHook_t pFunction) override
+    {
+        m_original->SetWarningMessageHook(pFunction);
+    }
+
+    bool BShutdownIfAllPipesClosed() override
+    {
+        return m_original->BShutdownIfAllPipesClosed();
+    }
+
 protected:
-    // These are protected helper methods in the interface that we must implement
-    void RunFrame() override {} // STEAM_PRIVATE_API - protected in 2017
+    void RunFrame() override {}
 
     void DEPRECATED_Set_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
     {
-        // Can't call protected method on m_original, just ignore
         (void)func;
     }
 
     void DEPRECATED_Remove_SteamAPI_CPostAPIResultInProcess(void (*func)()) override
     {
-        // Can't call protected method on m_original, just ignore
         (void)func;
     }
 
     void Set_SteamAPI_CCheckCallbackRegisteredInProcess(SteamAPI_CheckCallbackRegistered_t func) override
     {
-        // Can't call protected method on m_original, just ignore
         (void)func;
     }
 };
