@@ -693,12 +693,20 @@ public:
 
     EBeginAuthSessionResult BeginAuthSession(const void *pAuthTicket, int cbAuthTicket, CSteamID steamID) override
     {
-        // always sending OK for CS:GO 
-        if (steamID.GetAppID() == 730)
+        EBeginAuthSessionResult result = m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
+        if (s_serverGC && result == k_EBeginAuthSessionResultOK)
         {
-            return k_EBeginAuthSessionResultOK;
+            uint64_t clientSteamId = steamID.ConvertToUint64();
+            s_serverGC->ClientConnected(clientSteamId, pAuthTicket, cbAuthTicket);
+
+            if (s_clientGC && !SteamGameServerNetworking())
+            {
+                Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
+                s_clientGC->SetListenServer(s_serverGC, clientSteamId);
+                s_clientGC->SendSOCacheToGameSever();
+            }
         }
-        return m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
+        return result;
     }
 
     void EndAuthSession(CSteamID steamID) override
