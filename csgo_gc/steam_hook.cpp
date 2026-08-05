@@ -753,6 +753,10 @@ public:
     {
     }
 
+    // ============================================================
+    // ВСЕ МЕТОДЫ ISteamUser
+    // ============================================================
+
     HSteamUser GetHSteamUser() override
     {
         return m_original->GetHSteamUser();
@@ -763,6 +767,15 @@ public:
         return m_original->BLoggedOn();
     }
 
+    CSteamID GetSteamID() override
+    {
+        return m_original->GetSteamID();
+    }
+
+    int InitiateGameConnection(void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer, bool bSecure) override
+    {
+        return m_original->InitiateGameConnection(pAuthBlob, cbMaxAuthBlob, steamIDGameServer, unIPServer, usPortServer, bSecure);
+    }
 
     void TerminateGameConnection(uint32 unIPServer, uint16 usPortServer) override
     {
@@ -816,7 +829,6 @@ public:
         {
             s_clientGC->SetAuthTicket(ticket, pTicket, *pcbTicket);
         }
-
         return ticket;
     }
 
@@ -849,7 +861,6 @@ public:
         {
             s_clientGC->ClearAuthTicket(hAuthTicket);
         }
-
         m_original->CancelAuthTicket(hAuthTicket);
     }
 
@@ -906,7 +917,6 @@ public:
     {
         return m_original->BIsTwoFactorEnabled();
     }
-
 };
 
 class SteamMatchmakingServersProxy : public ISteamMatchmakingServers
