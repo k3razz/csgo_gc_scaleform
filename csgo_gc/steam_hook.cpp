@@ -693,6 +693,11 @@ public:
 
     EBeginAuthSessionResult BeginAuthSession(const void *pAuthTicket, int cbAuthTicket, CSteamID steamID) override
     {
+        // always sending OK for CS:GO 
+        if (steamID.GetAppID() == 730)
+        {
+            return k_EBeginAuthSessionResultOK;
+        }
         return m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
     }
 
