@@ -328,7 +328,22 @@ void ClientGC::SendRankUpdate()
 
 void ClientGC::OnClientHello(GCMessageRead &messageRead)
 {
-    Platform::Print("[GC] OnClientHello: received ClientHello\n");
+    static int helloCount = 0;
+    helloCount++;
+    
+    if (helloCount > 1)
+    {
+        Platform::Print("[GC] OnClientHello: ignoring duplicate (count=%d)\n", helloCount);
+        return;
+    }
+
+    Platform::Print("[GC] OnClientHello: processing (count=%d)\n", helloCount);
+
+    CMsgClientHello hello;
+    if (!messageRead.ReadProtobuf(hello))
+    {
+        Platform::Print("[GC] OnClientHello: failed to parse\n");
+    }
 
     CMsgClientWelcome clientWelcome;
     clientWelcome.set_version(0);
@@ -343,15 +358,12 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     csWelcome.set_last_time_played(1680260376);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
 
-    static bool inventorySent = false;
-    if (!inventorySent)
-    {
-        m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
-        inventorySent = true;
-    }
+    m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
 
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
     SendRankUpdate();
+
+    Platform::Print("[GC] OnClientHello: done\n");
 }
 
 void ClientGC::AdjustItemEquippedState(GCMessageRead &messageRead)
