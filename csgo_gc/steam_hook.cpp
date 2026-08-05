@@ -615,9 +615,13 @@ public:
     {
     }
 
+    // ============================================================
+    // ОБХОД ЛИЦЕНЗИИ - CS:GO (appID 730)
+    // ============================================================
+
     bool BIsSubscribed() override
     {
-        return true;
+        return true;  // Всегда подписан
     }
 
     bool BIsSubscribedApp(AppId_t appID) override
@@ -631,6 +635,10 @@ public:
         if (appID == 730) return true;
         return m_original->BIsAppInstalled(appID);
     }
+
+    // ============================================================
+    // ОСТАЛЬНЫЕ МЕТОДЫ (только те, что есть в твоём SDK)
+    // ============================================================
 
     uint32 GetAppData(AppId_t nAppID, const char *pchKey, char *pchValue, int cchValueMax) override
     {
@@ -685,36 +693,6 @@ public:
     const char *GetLaunchQueryParam(const char *pchKey) override
     {
         return m_original->GetLaunchQueryParam(pchKey);
-    }
-
-    SteamAPICall_t GetFileDetails(const char *pszFileName) override
-    {
-        return m_original->GetFileDetails(pszFileName);
-    }
-
-    int GetNumDlcInstalled() override
-    {
-        return m_original->GetNumDlcInstalled();
-    }
-
-    const char *GetInstalledDLCName(int iIndex) override
-    {
-        return m_original->GetInstalledDLCName(iIndex);
-    }
-
-    AppId_t GetInstalledDLC(int iIndex) override
-    {
-        return m_original->GetInstalledDLC(iIndex);
-    }
-
-    int GetDLCDownloadProgress(AppId_t nAppID, uint64 *puBytesDownloaded, uint64 *puBytesTotal) override
-    {
-        return m_original->GetDLCDownloadProgress(nAppID, puBytesDownloaded, puBytesTotal);
-    }
-
-    bool GetAppInstallDir(AppId_t nAppID, char *pchDir, int cbDir) override
-    {
-        return m_original->GetAppInstallDir(nAppID, pchDir, cbDir);
     }
 };
 
