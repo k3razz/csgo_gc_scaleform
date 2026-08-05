@@ -328,28 +328,39 @@ void ClientGC::SendRankUpdate()
 
 void ClientGC::OnClientHello(GCMessageRead &messageRead)
 {
+    Platform::Print("[GC] OnClientHello: received ClientHello\n");
+
     CMsgClientHello hello;
     if (!messageRead.ReadProtobuf(hello))
     {
-        Platform::Print("ClientHello parse failed, continuing anyway\n");
+        Platform::Print("[GC] OnClientHello: failed to parse ClientHello, continuing anyway\n");
     }
 
     CMsgClientWelcome clientWelcome;
     clientWelcome.set_version(0);
     clientWelcome.set_rtime32_gc_welcome_timestamp(static_cast<uint32_t>(time(nullptr)));
-    clientWelcome.set_currency(1); // USD
+    clientWelcome.set_currency(1);     // Доллары США
     clientWelcome.set_txn_country_code("US");
-    
+
     CMsgCStrike15Welcome csWelcome;
     csWelcome.set_store_item_hash(136617352);
     csWelcome.set_timeplayedconsecutively(0);
     csWelcome.set_time_first_played(1329845773);
     csWelcome.set_last_time_played(1680260376);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
+
+    m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
+
+    CMsgGCCStrike15_v2_MatchmakingGC2ClientHello mmHello;
+    BuildMatchmakingHello(mmHello);
+    clientWelcome.set_game_data2(mmHello.SerializeAsString());
     
+    Platform::Print("[GC] OnClientHello: sending ClientWelcome with inventory\n");
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
 
     SendRankUpdate();
+
+    Platform::Print("[GC] OnClientHello: ClientWelcome sent successfully\n");
 }
 
 void ClientGC::AdjustItemEquippedState(GCMessageRead &messageRead)
