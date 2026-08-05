@@ -287,18 +287,18 @@ void ClientGC::BuildMatchmakingHello(CMsgGCCStrike15_v2_MatchmakingGC2ClientHell
 void ClientGC::BuildClientWelcome(CMsgClientWelcome &message, const CMsgCStrike15Welcome &csWelcome,
     const CMsgGCCStrike15_v2_MatchmakingGC2ClientHello &matchmakingHello)
 {
-    // mikkotodo remove dox
-    message.set_version(0); // this is accurate
+    message.set_version(0);
     message.set_game_data(csWelcome.SerializeAsString());
-    // Keep cache subscription so the client can load inventory.
+    
     m_inventory.BuildCacheSubscription(*message.add_outofdate_subscribed_caches(), m_config.Level(), false);
+    
     message.mutable_location()->set_latitude(65.0133006f);
     message.mutable_location()->set_longitude(25.4646212f);
-    message.mutable_location()->set_country("FI"); // finland
+    message.mutable_location()->set_country("FI");
     message.set_game_data2(matchmakingHello.SerializeAsString());
     message.set_rtime32_gc_welcome_timestamp(static_cast<uint32_t>(time(nullptr)));
-    message.set_currency(2); // euros
-    message.set_txn_country_code("FI"); // finland
+    message.set_currency(1); // USD Currency
+    message.set_txn_country_code("US"); // USA country code
 }
 
 void ClientGC::SendRankUpdate()
@@ -331,25 +331,24 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     CMsgClientHello hello;
     if (!messageRead.ReadProtobuf(hello))
     {
-        Platform::Print("Parsing CMsgClientHello failed, ignoring\n");
-        return;
+        Platform::Print("ClientHello parse failed, continuing anyway\n");
     }
 
-    // we don't care about anything in this message, just reply
-    CMsgCStrike15Welcome csWelcome;
-    BuildCSWelcome(csWelcome);
-
-    CMsgGCCStrike15_v2_MatchmakingGC2ClientHello mmHello;
-    BuildMatchmakingHello(mmHello);
-
     CMsgClientWelcome clientWelcome;
-    BuildClientWelcome(clientWelcome, csWelcome, mmHello);
-
+    clientWelcome.set_version(0);
+    clientWelcome.set_rtime32_gc_welcome_timestamp(static_cast<uint32_t>(time(nullptr)));
+    clientWelcome.set_currency(1); // USD
+    clientWelcome.set_txn_country_code("US");
+    
+    CMsgCStrike15Welcome csWelcome;
+    csWelcome.set_store_item_hash(136617352);
+    csWelcome.set_timeplayedconsecutively(0);
+    csWelcome.set_time_first_played(1329845773);
+    csWelcome.set_last_time_played(1680260376);
+    clientWelcome.set_game_data(csWelcome.SerializeAsString());
+    
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
 
-    SendMessageToGame(false, k_EMsgGCCStrike15_v2_MatchmakingGC2ClientHello, mmHello);
-
-    // send all ranks here as well, it's a bit back and forth with real gc
     SendRankUpdate();
 }
 
