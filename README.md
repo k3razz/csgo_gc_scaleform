@@ -1,5 +1,4 @@
-# Для тех, кто пришёл с Dalace Client:
-## Это не мой мод! Оригинал -> https://github.com/Rowkai/csgo_gc_scaleform
+
 # csgo_gc_scaleform
 
 > [!WARNING]
