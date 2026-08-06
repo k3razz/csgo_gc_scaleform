@@ -30,3 +30,6 @@
 
 // remove keys, cases, stickers, etc. after they've been used
 "destroy_used_items"	"1"
+
+prime 1
+elevated_state 5

@@ -22,7 +22,9 @@ public:
     int DangerZoneWins() const { return m_dangerZoneWins; }
 
     bool DestroyUsedItems() const { return m_destroyUsedItems; }
-    bool ForceLicense() const { return true; } // Always true ( spoofs license )
+    bool ForceLicense() const { return true; }
+    bool IsPrime() const { return true; }
+    int ElevatedState() const { return 5; }
 
     bool VacBanned() const { return m_vacBanned; }
     int CommendedFriendly() const { return m_commendedFriendly; }
