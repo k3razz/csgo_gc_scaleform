@@ -623,20 +623,21 @@ public:
 
     bool BIsSubscribedApp(AppId_t appID) override
     {
-        if (appID == 730 || appID == 624820)
-        {
-            return true;
-        }
-        return m_original->BIsSubscribedApp(appID);
+     if (appID == 730 || appID == 624820 || appID == 0)
+      {
+          Platform::Print("[SteamAppsProxy] BIsSubscribedApp: forcing true for appID=%u\n", appID);
+          return true;
+       }
+      return m_original->BIsSubscribedApp(appID);
     }
 
     bool BIsAppInstalled(AppId_t appID) override
     {
-        if (appID == 730 || appID == 624820)
-        {
-            return true;
-        }
-        return m_original->BIsAppInstalled(appID);
+       if (appID == 730 || appID == 624820)
+      {
+         return true;
+      }
+      return m_original->BIsAppInstalled(appID);
     }
 
 
@@ -854,30 +855,63 @@ public:
 
     HAuthTicket GetAuthSessionTicket(void *pTicket, int cbMaxTicket, uint32 *pcbTicket) override
     {
+        Platform::Print("[SteamUserProxy] GetAuthSessionTicket: cbMaxTicket=%d\n", cbMaxTicket);
+    
         HAuthTicket ticket = m_original->GetAuthSessionTicket(pTicket, cbMaxTicket, pcbTicket);
-        if (s_clientGC && ticket != k_HAuthTicketInvalid)
+    
+        if (ticket == k_HAuthTicketInvalid || ticket == 0)
         {
-            s_clientGC->SetAuthTicket(ticket, pTicket, *pcbTicket);
-        }
+            Platform::Print("[SteamUserProxy] GetAuthSessionTicket: generating fake ticket\n");
+        
+            uint8_t fakeTicket[1024];
+             memset(fakeTicket, 0xAA, sizeof(fakeTicket));
+        
+            int ticketSize = (cbMaxTicket < 1024) ? cbMaxTicket : 1024;
+            memcpy(pTicket, fakeTicket, ticketSize);
+            if (pcbTicket) *pcbTicket = ticketSize;
+        
+            if (s_clientGC)
+            {
+                s_clientGC->SetAuthTicket(1, pTicket, ticketSize);
+            }
+        
+          return 1;
+       }
+    
+      if (s_clientGC && ticket != k_HAuthTicketInvalid)
+      {
+          s_clientGC->SetAuthTicket(ticket, pTicket, *pcbTicket);
+      }
+    
         return ticket;
     }
 
     EBeginAuthSessionResult BeginAuthSession(const void *pAuthTicket, int cbAuthTicket, CSteamID steamID) override
     {
-        EBeginAuthSessionResult result = m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
-        if (s_serverGC && result == k_EBeginAuthSessionResultOK)
-        {
-            uint64_t clientSteamId = steamID.ConvertToUint64();
-            s_serverGC->ClientConnected(clientSteamId, pAuthTicket, cbAuthTicket);
+        Platform::Print("[SteamUserProxy] BeginAuthSession: steamID=%llu, ticketSize=%d\n", 
+                       steamID.ConvertToUint64(), cbAuthTicket);
 
-            if (s_clientGC && !SteamGameServerNetworking())
+          if (steamID.GetAppID() == 730)
+          {
+             Platform::Print("[SteamUserProxy] BeginAuthSession: forcing OK for CS:GO\n");
+        
+            uint64_t clientSteamId = steamID.ConvertToUint64();
+            if (s_serverGC)
             {
-                Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
-                s_clientGC->SetListenServer(s_serverGC, clientSteamId);
-                s_clientGC->SendSOCacheToGameSever();
+                s_serverGC->ClientConnected(clientSteamId, pAuthTicket, cbAuthTicket);
             }
-        }
-        return result;
+        
+            if (s_clientGC && !SteamGameServerNetworking())
+             {
+                  Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
+                  s_clientGC->SetListenServer(s_serverGC, clientSteamId);
+                   s_clientGC->SendSOCacheToGameSever();
+             }
+        
+             return k_EBeginAuthSessionResultOK;
+    
+          }
+         return m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
     }
 
     void EndAuthSession(CSteamID steamID) override
@@ -1554,7 +1588,7 @@ static void Hk_SteamAPI_RunCallbacks()
             param.m_nMessageSize = messageSize;
             s_callbackHooks.RunCallback(false, GCMessageAvailable_t::k_iCallback, &param);
         }
-        
+
         static bool txnSent = false;
         if (!txnSent)
         {
@@ -1564,7 +1598,7 @@ static void Hk_SteamAPI_RunCallbacks()
             response.m_bAuthorized = 1;
             s_callbackHooks.RunCallback(false, MicroTxnAuthorizationResponse_t::k_iCallback, &response);
             txnSent = true;
-            Platform::Print("[GC] MicroTxnAuthorizationResponse sent once\n");
+            Platform::Print("[GC] MicroTxnAuthorizationResponse sent (for achievements)\n");
         }
 
         s_clientGC->Update();
