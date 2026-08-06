@@ -339,7 +339,7 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     CMsgClientWelcome clientWelcome;
     clientWelcome.set_version(0);
     clientWelcome.set_rtime32_gc_welcome_timestamp(static_cast<uint32_t>(time(nullptr)));
-    clientWelcome.set_currency(1);     // Доллары США
+    clientWelcome.set_currency(1);
     clientWelcome.set_txn_country_code("US");
 
     CMsgCStrike15Welcome csWelcome;
@@ -347,8 +347,8 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     csWelcome.set_timeplayedconsecutively(0);
     csWelcome.set_time_first_played(1329845773);
     csWelcome.set_last_time_played(1680260376);
-    csWelcome.set_prime(true);  // <-- ГЛАВНОЕ! ВКЛЮЧАЕМ PRIME
-    csWelcome.set_elevated_state(5);  // 5 = Prime статус
+    csWelcome.set_prime(true);
+    csWelcome.set_elevated_state(5);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
 
     m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);

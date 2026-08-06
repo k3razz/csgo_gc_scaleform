@@ -17,9 +17,6 @@ constexpr int MaxStickers = 6;
 // Prime status elevated state value
 constexpr int ElevatedStatePrime = 5;
 
-// Prime DLC App ID
-constexpr AppId_t PrimeDLCAppId = 624820;
-
 enum RankType : uint32_t
 {
     RankTypeCompetitive = 6,
