@@ -615,18 +615,14 @@ public:
     {
     }
 
-    // ============================================================
-    // ОБХОД ЛИЦЕНЗИИ + PRIME STATUS
-    // ============================================================
 
     bool BIsSubscribed() override
     {
-        return true;  // Всегда подписан на основную игру
+        return true;
     }
 
     bool BIsSubscribedApp(AppId_t appID) override
     {
-        // CS:GO (730) ИЛИ Prime DLC (624820) - всегда возвращаем true
         if (appID == 730 || appID == 624820)
         {
             return true;
@@ -636,7 +632,6 @@ public:
 
     bool BIsAppInstalled(AppId_t appID) override
     {
-        // CS:GO (730) ИЛИ Prime DLC (624820) - всегда возвращаем true
         if (appID == 730 || appID == 624820)
         {
             return true;
@@ -644,9 +639,6 @@ public:
         return m_original->BIsAppInstalled(appID);
     }
 
-    // ============================================================
-    // ВСЕ ОСТАЛЬНЫЕ МЕТОДЫ (ПРОКСИ)
-    // ============================================================
 
     bool BIsLowViolence() override
     {
@@ -675,7 +667,7 @@ public:
 
     bool BIsDlcInstalled(AppId_t appID) override
     {
-        if (appID == 624820)  // Prime DLC всегда установлен
+        if (appID == 624820)
         {
             return true;
         }
@@ -686,7 +678,6 @@ public:
     {
         if (nAppID == 730 || nAppID == 624820)
         {
-            // Возвращаем дату покупки (например, 1 января 2020)
             return 1577836800;
         }
         return m_original->GetEarliestPurchaseUnixTime(nAppID);
@@ -694,19 +685,17 @@ public:
 
     bool BIsSubscribedFromFreeWeekend() override
     {
-        return false;  // Не из бесплатного уикенда
+        return false;
     }
 
     int GetDLCCount() override
     {
-        // Возвращаем хотя бы 1 DLC (Prime)
         int count = m_original->GetDLCCount();
         return count > 0 ? count : 1;
     }
 
     bool BGetDLCDataByIndex(int iDLC, AppId_t *pAppID, bool *pbAvailable, char *pchName, int cchNameBufferSize) override
     {
-        // Если индекс 0 и DLC нет, подменяем на Prime
         if (iDLC == 0 && m_original->GetDLCCount() == 0)
         {
             if (pAppID) *pAppID = 624820;
@@ -769,7 +758,6 @@ public:
     {
         if (nAppID == 624820)
         {
-            // Prime DLC уже установлен
             if (punBytesDownloaded) *punBytesDownloaded = 1;
             if (punBytesTotal) *punBytesTotal = 1;
             return true;
@@ -798,9 +786,6 @@ public:
     {
     }
 
-    // ============================================================
-    // ВСЕ МЕТОДЫ ISteamUser
-    // ============================================================
 
     HSteamUser GetHSteamUser() override
     {
@@ -1569,12 +1554,18 @@ static void Hk_SteamAPI_RunCallbacks()
             param.m_nMessageSize = messageSize;
             s_callbackHooks.RunCallback(false, GCMessageAvailable_t::k_iCallback, &param);
         }
-
-        MicroTxnAuthorizationResponse_t response;
-        response.m_unAppID = 730;
-        response.m_ulOrderID = 0;
-        response.m_bAuthorized = 1;
-        s_callbackHooks.RunCallback(false, MicroTxnAuthorizationResponse_t::k_iCallback, &response);
+        
+        static bool txnSent = false;
+        if (!txnSent)
+        {
+            MicroTxnAuthorizationResponse_t response;
+            response.m_unAppID = 730;
+            response.m_ulOrderID = 0;
+            response.m_bAuthorized = 1;
+            s_callbackHooks.RunCallback(false, MicroTxnAuthorizationResponse_t::k_iCallback, &response);
+            txnSent = true;
+            Platform::Print("[GC] MicroTxnAuthorizationResponse sent once\n");
+        }
 
         s_clientGC->Update();
     }
