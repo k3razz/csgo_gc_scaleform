@@ -14,9 +14,6 @@ constexpr uint64_t ItemIdDefaultItemMask = 0xfull << 60;
 // technically 5 but there are attributes for 6 stickers...
 constexpr int MaxStickers = 6;
 
-// Prime status elevated state value
-constexpr int ElevatedStatePrime = 5;
-
 enum RankType : uint32_t
 {
     RankTypeCompetitive = 6,

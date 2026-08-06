@@ -627,7 +627,7 @@ public:
     bool BIsSubscribedApp(AppId_t appID) override
     {
         // CS:GO (730) ИЛИ Prime DLC (624820) - всегда возвращаем true
-        if (appID == 730 || appID == 624820)
+        if (applicationID == 730 || applicationID == 624820)
         {
             return true;
         }
@@ -637,7 +637,7 @@ public:
     bool BIsAppInstalled(AppId_t appID) override
     {
         // CS:GO (730) ИЛИ Prime DLC (624820) - всегда возвращаем true
-        if (appID == 730 || appID == 624820)
+        if (applicationID == 730 || applicationID == 624820)
         {
             return true;
         }
@@ -909,14 +909,14 @@ public:
         m_original->CancelAuthTicket(hAuthTicket);
     }
 
-    EUserHasLicenseForAppResult UserHasLicenseForApp(CSteamID steamID, AppId_t appID) override
+    EUserHasLicenseForAppResult UserHasLicenseForApp(CSteamID steamID, AppId_t applicationID) override
     {
      // CS:GO (730) OR Prime DLC (624820) 
-     if (appID == 730 || appID == 624820)  // 624820 , Prime Status
+     if (applicationID == 730 || applicationID == 624820)  // 624820 , Prime Status
      {
          return k_EUserHasLicenseResultHasLicense;
      }
-     return m_original->UserHasLicenseForApp(steamID, appID);
+     return m_original->UserHasLicenseForApp(steamID, applicationID);
     }
 
     bool BIsBehindNAT() override

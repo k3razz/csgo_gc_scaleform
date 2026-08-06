@@ -347,8 +347,6 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     csWelcome.set_timeplayedconsecutively(0);
     csWelcome.set_time_first_played(1329845773);
     csWelcome.set_last_time_played(1680260376);
-    csWelcome.set_prime(true);
-    csWelcome.set_elevated_state(5);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
 
     m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
