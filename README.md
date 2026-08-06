@@ -1,4 +1,3 @@
-# csgo_gc_scaleform
 
 > [!WARNING]
 > Версии которые поддерживает CS:GO GC:
@@ -13,7 +12,7 @@
 >```
 > Всё еще очень много глобальных багов, но, я думаю, что смогу починить половину.
 >
-## **Scaleform Issues**
+## **Scaleform Проблемы**
 - Кейсы не открываются ( Не удаётся получить предмет. )
 - Подключение к стиму не исправно ( Сейчас чинится, не знаю сколько займет времени. ?
 
@@ -22,12 +21,12 @@
 > [!WARNING]
 > Этот проект ещё не готов к глобальному использованию.
 
-## License
-This project is licensed under the 2-Clause BSD License. See [LICENSE.md](LICENSE.md) for details.
+## Лицензия
+Этот проект использует 2-Clause BSD License. Просмотрите [LICENSE.md](LICENSE.md) для уточнений..
 
-## Credits
-* **Mikko Kokko** - Author
-* **Theeto** - Code reused from the predecessor project, unusual loot lists
+## Спасибо
+* **Mikko Kokko** - Автор
+
 
 ## Third party dependencies
 - [Crypto++](https://github.com/weidai11/cryptopp) ([Boost Software License](https://github.com/weidai11/cryptopp/blob/master/License.txt))
