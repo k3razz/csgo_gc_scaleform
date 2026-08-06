@@ -152,6 +152,14 @@ CSOEconItem &Inventory::CreateItem(const CSOEconItem &copyFrom)
 
 CSOEconItem &Inventory::CreateItem(uint32_t defIndex, ItemOrigin origin, UnacknowledgedType unacknowledgedType)
 {
+    const ItemInfo *itemInfo = m_itemSchema.ItemInfoByDefIndex(defIndex);
+    if (!itemInfo)
+    {
+        Platform::Print("[INVENTORY] ERROR: Item defIndex %u not found in schema! Skipping.\n", defIndex);
+        static CSOEconItem emptyItem;
+        return emptyItem;
+    }
+
     CSOEconItem &item = AllocateItem(0);
     m_itemSchema.CreateItem(defIndex, origin, unacknowledgedType, item);
     return item;
@@ -172,6 +180,15 @@ void Inventory::ReadFromFile()
 
         for (const KeyValue &itemKey : *itemsKey)
         {
+            uint32_t defIndex = itemKey.GetNumber<uint32_t>("def_index");
+            const ItemInfo *itemInfo = m_itemSchema.ItemInfoByDefIndex(defIndex);
+            
+            if (!itemInfo)
+            {
+                Platform::Print("[INVENTORY] Skipping unknown item defIndex %u (not in 2019 schema)\n", defIndex);
+                continue;
+            }
+
             uint32_t highItemId = FromString<uint32_t>(itemKey.Name());
             CSOEconItem &item = AllocateItem(highItemId);
             ReadItem(itemKey, item);
@@ -185,9 +202,18 @@ void Inventory::ReadFromFile()
 
         for (const KeyValue &defaultEquipKey : *defaultEquipsKey)
         {
+            uint32_t defIndex = FromString<uint32_t>(defaultEquipKey.Name());
+            const ItemInfo *itemInfo = m_itemSchema.ItemInfoByDefIndex(defIndex);
+            
+            if (!itemInfo)
+            {
+                Platform::Print("[INVENTORY] Skipping unknown default equip defIndex %u\n", defIndex);
+                continue;
+            }
+
             CSOEconDefaultEquippedDefinitionInstanceClient &defaultEquip = m_defaultEquips.emplace_back();
             defaultEquip.set_account_id(AccountId());
-            defaultEquip.set_item_definition(FromString<uint32_t>(defaultEquipKey.Name()));
+            defaultEquip.set_item_definition(defIndex);
             defaultEquip.set_class_id(defaultEquipKey.GetNumber<uint32_t>("class_id"));
             defaultEquip.set_slot_id(defaultEquipKey.GetNumber<uint32_t>("slot_id"));
         }
