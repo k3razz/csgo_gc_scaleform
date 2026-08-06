@@ -1,6 +1,6 @@
 # csgo_gc_scaleform
 
-[!warning]
+[!WARNING]
 > Версии которые поддерживает CS:GO GC:
 > ```
 > download_depot 730 731 7043469183016184477
