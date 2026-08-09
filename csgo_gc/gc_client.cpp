@@ -348,9 +348,6 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     csWelcome.set_time_first_played(1329845773);
     csWelcome.set_last_time_played(1680260376);
     clientWelcome.set_game_data(csWelcome.SerializeAsString());
-    clientWelcome.set_inventory_access(m_config.HasInventoryAccess());
-    csWelcome.set_has_inventory_access(true);
-    csWelcome.set_inventory_access_granted(true);
 
     m_inventory.BuildCacheSubscription(*clientWelcome.add_outofdate_subscribed_caches(), m_config.Level(), false);
 
