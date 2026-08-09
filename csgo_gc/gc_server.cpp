@@ -11,52 +11,22 @@ static std::random_device s_rd;
 static std::mt19937 s_gen(s_rd());
 
 static const std::vector<uint32_t> s_availableSkins = {
-    7,   // AK-47
-    8,   // M4A4
-    9,   // M4A1-S
-    11,  // AWP
-    13,  // Glock-18
-    14,  // USP-S
-    16,  // P2000
-    19,  // Five-SeveN
-    22,  // Desert Eagle
-    26,  // P250
-    28,  // Tec-9
-    30,  // CZ75-Auto
-    32,  // Dual Berettas
-    34,  // Nova
-    35,  // XM1014
-    36,  // MAG-7
-    38,  // MP9
-    39,  // MAC-10
-    40,  // MP5-SD
-    41,  // UMP-45
-    42,  // P90
-    43,  // PP-Bizon
-    45,  // MP7
-    46,  // Galil AR
-    47,  // FAMAS
-    48,  // SSG 08
-    49,  // AUG
-    50,  // SG 553
-    51,  // M249
-    52,  // Negev
-    53,  // Sawed-Off
-    54,  // SCAR-20
-    55,  // G3SG1
-    72,  // Knife
-    73,  // Knife Bayonet
-    74,  // Knife Flip
-    75,  // Knife Gut
-    76,  // Knife Karambit
-    77,  // Knife M9 Bayonet
-    78,  // Knife Huntsman
-    79,  // Knife Falchion
-    80,  // Knife Butterfly
-    81,  // Knife Shadow Daggers
-    82,  // Knife Bowie
-    83,  // Knife Classic
+    7, 8, 9, 11, 13, 14, 16, 19, 22, 26, 28, 30, 32,
+    34, 35, 36, 38, 39, 40, 41, 42, 43, 45, 46, 47,
+    48, 49, 50, 51, 52, 53, 54, 55,
+    72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83
 };
+
+bool IsBot(uint64_t steamId)
+{
+    return (steamId == 0 || steamId == 0xFFFFFFFFFFFFFFFF || steamId > 0xFFFFFFFF00000000ULL);
+}
+
+uint32_t GetRandomSkinDefIndex()
+{
+    std::uniform_int_distribution<> dis(0, s_availableSkins.size() - 1);
+    return s_availableSkins[dis(s_gen)];
+}
 
 ServerGC::ServerGC()
 {
@@ -110,6 +80,12 @@ void ServerGC::ClientConnected(uint64_t steamId, const void *ticket, uint32_t ti
 {
     Platform::Print("ClientConnected: %llu\n", steamId);
     m_networking.ClientConnected(steamId, ticket, ticketSize);
+    
+    if (IsBot(steamId))
+    {
+        uint32_t skin = GetRandomSkinDefIndex();
+        Platform::Print("[ServerGC] Bot %llu assigned skin %u\n", steamId, skin);
+    }
 }
 
 void ServerGC::ClientDisconnected(uint64_t steamId)
@@ -198,7 +174,6 @@ void ServerGC::HandleNetMessage(uint64_t steamId, const void *data, uint32_t siz
         return;
     }
 
-    // validate the type and contents
     bool isValid = false;
 
     switch (type)
