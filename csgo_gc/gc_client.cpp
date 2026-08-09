@@ -358,6 +358,11 @@ void ClientGC::OnClientHello(GCMessageRead &messageRead)
     Platform::Print("[GC] OnClientHello: sending ClientWelcome with PRIME enabled\n");
     SendMessageToGame(false, k_EMsgGCClientWelcome, clientWelcome);
 
+    CMsgSOCacheSubscribed cacheMessage;
+    m_inventory.BuildCacheSubscription(cacheMessage, m_config.Level(), false);
+    SendMessageToGame(false, k_ESOMsg_CacheSubscribed, cacheMessage);
+    Platform::Print("[GC] OnClientHello: sent CacheSubscribed separately\n");
+
     SendRankUpdate();
 
     Platform::Print("[GC] OnClientHello: ClientWelcome sent successfully\n");
