@@ -32,8 +32,7 @@ public:
     int CommendedLeader() const { return m_commendedLeader; }
     int Level() const { return m_level; }
     int Xp() const { return m_xp; }
-
-    bool HasInventoryAccess() const { return true; }
+    int RandomBotSkins() const { return m_randomBotSkins; }
 
     float GetRarityWeight(uint32_t rarity) const;
 
@@ -53,6 +52,7 @@ private:
     int m_commendedLeader{ 0 };
     int m_level{ 0 };
     int m_xp{ 0 };
+    int m_randomBotSkins{ 0 };
 
     // default to valve weights
     std::vector<RarityWeight> m_rarityWeights{

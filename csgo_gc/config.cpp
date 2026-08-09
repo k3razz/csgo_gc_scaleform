@@ -28,6 +28,7 @@ GCConfig::GCConfig()
     }
 
     m_destroyUsedItems = config.GetNumber("destroy_used_items", m_destroyUsedItems);
+    m_randomBotSkins = config.GetNumber("random_bot_skins", m_randomBotSkins);
 
     const KeyValue *rarityWeights = config.GetSubkey("rarity_weights");
     if (rarityWeights)

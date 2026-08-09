@@ -3,14 +3,64 @@
 #include "gc_const.h"
 #include "gc_const_csgo.h"
 #include "graffiti.h"
+#include <random>
 
 const char *MessageName(uint32_t type);
+
+static std::random_device s_rd;
+static std::mt19937 s_gen(s_rd());
+
+static const std::vector<uint32_t> s_availableSkins = {
+    7,   // AK-47
+    8,   // M4A4
+    9,   // M4A1-S
+    11,  // AWP
+    13,  // Glock-18
+    14,  // USP-S
+    16,  // P2000
+    19,  // Five-SeveN
+    22,  // Desert Eagle
+    26,  // P250
+    28,  // Tec-9
+    30,  // CZ75-Auto
+    32,  // Dual Berettas
+    34,  // Nova
+    35,  // XM1014
+    36,  // MAG-7
+    38,  // MP9
+    39,  // MAC-10
+    40,  // MP5-SD
+    41,  // UMP-45
+    42,  // P90
+    43,  // PP-Bizon
+    45,  // MP7
+    46,  // Galil AR
+    47,  // FAMAS
+    48,  // SSG 08
+    49,  // AUG
+    50,  // SG 553
+    51,  // M249
+    52,  // Negev
+    53,  // Sawed-Off
+    54,  // SCAR-20
+    55,  // G3SG1
+    72,  // Knife
+    73,  // Knife Bayonet
+    74,  // Knife Flip
+    75,  // Knife Gut
+    76,  // Knife Karambit
+    77,  // Knife M9 Bayonet
+    78,  // Knife Huntsman
+    79,  // Knife Falchion
+    80,  // Knife Butterfly
+    81,  // Knife Shadow Daggers
+    82,  // Knife Bowie
+    83,  // Knife Classic
+};
 
 ServerGC::ServerGC()
 {
     Platform::Print("ServerGC spawned\n");
-
-    // also called from ClientGC's constructor
     Graffiti::Initialize();
 }
 
@@ -37,7 +87,6 @@ void ServerGC::HandleMessage(uint32_t type, const void *data, uint32_t size)
             break;
 
         case k_EMsgGCCStrike15_v2_Server2GCClientValidate:
-            // server doesn't want a response so ignore
             break;
 
         case k_EMsgGC_IncrementKillCountAttribute:
@@ -79,7 +128,6 @@ void ServerGC::Update()
 {
     if (!m_receivedHello)
     {
-        // we're not up yet, just sit and wait
         return;
     }
 
@@ -130,7 +178,6 @@ void ServerGC::HandleNetMessage(uint64_t steamId, const void *data, uint32_t siz
 
     if (!validate.IsProtobuf())
     {
-        // all the allowed messages are protobuf based
         Platform::Print("ServerGC: ignoring non protobuf message %u from %llu\n",
             validate.TypeUnmasked(), steamId);
         return;
@@ -196,8 +243,6 @@ void ServerGC::OnServerHello(GCMessageRead &messageRead)
 
     Platform::Print("ServerGC received ServerHello\n");
 
-    // we don't care about anything in this message, just reply
-
     CMsgCStrike15Welcome csWelcome;
     csWelcome.set_gscookieid(GameServerCookieId);
 
@@ -221,7 +266,6 @@ void ServerGC::IncrementKillCountAttribute(GCMessageRead &messageRead)
         return;
     }
 
-    // just forward it to the killer
     GCMessageWrite messageWrite{ k_EMsgGC_IncrementKillCountAttribute, message };
     CSteamID killerId{ message.killer_account_id(), k_EUniversePublic, k_EAccountTypeIndividual };
     m_networking.SendMessage(killerId.ConvertToUint64(), messageWrite);
