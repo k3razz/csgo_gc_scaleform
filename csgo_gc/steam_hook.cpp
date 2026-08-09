@@ -888,12 +888,13 @@ public:
 
     EBeginAuthSessionResult BeginAuthSession(const void *pAuthTicket, int cbAuthTicket, CSteamID steamID) override
     {
-        Platform::Print("[SteamUserProxy] BeginAuthSession: steamID=%llu, ticketSize=%d\n", 
-                       steamID.ConvertToUint64(), cbAuthTicket);
+      Platform::Print("[SteamUserProxy] BeginAuthSession: steamID=%llu, ticketSize=%d\n", 
+                        steamID.ConvertToUint64(), cbAuthTicket);
 
-          if (steamID.GetAppID() == 730)
-          {
-             Platform::Print("[SteamUserProxy] BeginAuthSession: forcing OK for CS:GO\n");
+        if (steamID.GetEAccountType() == k_EAccountTypeIndividual || 
+            steamID.GetEAccountType() == k_EAccountTypeGameServer)
+        {
+            Platform::Print("[SteamUserProxy] BeginAuthSession: forcing OK for CS:GO\n");
         
             uint64_t clientSteamId = steamID.ConvertToUint64();
             if (s_serverGC)
@@ -902,16 +903,15 @@ public:
             }
         
             if (s_clientGC && !SteamGameServerNetworking())
-             {
-                  Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
-                  s_clientGC->SetListenServer(s_serverGC, clientSteamId);
-                   s_clientGC->SendSOCacheToGameSever();
-             }
+            {
+                Platform::Print("Listen-server detected: setting up direct GC channel for %llu\n", clientSteamId);
+                s_clientGC->SetListenServer(s_serverGC, clientSteamId);
+                s_clientGC->SendSOCacheToGameSever();
+        }
         
-             return k_EBeginAuthSessionResultOK;
-    
-          }
-         return m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
+            return k_EBeginAuthSessionResultOK;
+        }
+        return m_original->BeginAuthSession(pAuthTicket, cbAuthTicket, steamID);
     }
 
     void EndAuthSession(CSteamID steamID) override
