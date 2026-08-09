@@ -4,11 +4,14 @@
 #include "gc_const_csgo.h"
 #include "graffiti.h"
 #include <random>
+#include <unordered_set>
 
 const char *MessageName(uint32_t type);
 
 static std::random_device s_rd;
 static std::mt19937 s_gen(s_rd());
+static std::unordered_set<uint64_t> s_assignedPlayers;
+static uint64_t s_localPlayerSteamId = 0;
 
 static const std::vector<uint32_t> s_availableSkins = {
     7, 8, 9, 11, 13, 14, 16, 19, 22, 26, 28, 30, 32,
@@ -17,15 +20,21 @@ static const std::vector<uint32_t> s_availableSkins = {
     72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83
 };
 
-bool IsBot(uint64_t steamId)
-{
-    return (steamId == 0 || steamId == 0xFFFFFFFFFFFFFFFF || steamId > 0xFFFFFFFF00000000ULL);
-}
-
 uint32_t GetRandomSkinDefIndex()
 {
     std::uniform_int_distribution<> dis(0, s_availableSkins.size() - 1);
     return s_availableSkins[dis(s_gen)];
+}
+
+bool IsLocalPlayer(uint64_t steamId)
+{
+    if (s_localPlayerSteamId == 0)
+    {
+        s_localPlayerSteamId = steamId;
+        Platform::Print("[ServerGC] Local player detected: %llu\n", steamId);
+        return true;
+    }
+    return (steamId == s_localPlayerSteamId);
 }
 
 ServerGC::ServerGC()
@@ -80,13 +89,22 @@ void ServerGC::ClientConnected(uint64_t steamId, const void *ticket, uint32_t ti
 {
     Platform::Print("ClientConnected: %llu\n", steamId);
     m_networking.ClientConnected(steamId, ticket, ticketSize);
-    
-    Platform::Print("[DEBUG] ClientConnected: steamId=%llu, IsBot=%d\n", steamId, IsBot(steamId));
-    
-    if (IsBot(steamId))
+
+    if (s_localPlayerSteamId == 0)
+    {
+        s_localPlayerSteamId = steamId;
+        Platform::Print("[ServerGC] Local player set: %llu\n", steamId);
+    }
+
+    if (!IsLocalPlayer(steamId))
     {
         uint32_t skin = GetRandomSkinDefIndex();
-        Platform::Print("[ServerGC] Bot %llu assigned skin %u\n", steamId, skin);
+        Platform::Print("[ServerGC] Player %llu assigned random skin %u\n", steamId, skin);
+        s_assignedPlayers.insert(steamId);
+    }
+    else
+    {
+        Platform::Print("[ServerGC] Local player %llu - keeping original inventory\n", steamId);
     }
 }
 
@@ -94,6 +112,8 @@ void ServerGC::ClientDisconnected(uint64_t steamId)
 {
     Platform::Print("ClientDisconnected: %llu\n", steamId);
     m_networking.ClientDisconnected(steamId);
+
+    s_assignedPlayers.erase(steamId);
 
     CMsgSOCacheUnsubscribed message;
     message.mutable_owner_soid()->set_type(SoIdTypeSteamId);
