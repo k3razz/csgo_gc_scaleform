@@ -33,6 +33,8 @@ public:
     int Level() const { return m_level; }
     int Xp() const { return m_xp; }
 
+    bool HasInventoryAccess() const { return true; }
+
     float GetRarityWeight(uint32_t rarity) const;
 
 private:
