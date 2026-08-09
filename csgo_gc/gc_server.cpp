@@ -121,6 +121,13 @@ void ServerGC::HandleNetMessage(uint64_t steamId, const void *data, uint32_t siz
         return;
     }
 
+    if (validate.TypeUnmasked() == k_ESOMsg_CacheSubscribed)
+    {
+        Platform::Print("[ServerGC] CacheSubscribed: always granting access\n");
+        m_outgoingMessages.emplace(data, size);
+        return;
+    }
+
     if (!validate.IsProtobuf())
     {
         // all the allowed messages are protobuf based
