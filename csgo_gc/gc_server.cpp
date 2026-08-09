@@ -81,6 +81,8 @@ void ServerGC::ClientConnected(uint64_t steamId, const void *ticket, uint32_t ti
     Platform::Print("ClientConnected: %llu\n", steamId);
     m_networking.ClientConnected(steamId, ticket, ticketSize);
     
+    Platform::Print("[DEBUG] ClientConnected: steamId=%llu, IsBot=%d\n", steamId, IsBot(steamId));
+    
     if (IsBot(steamId))
     {
         uint32_t skin = GetRandomSkinDefIndex();
